@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <style>[hidden]{display:none!important}body{margin:0}</style>
+<script src="config.js"></script>
 </head>
 <body>
 <title>Суфлёр оператора</title>
@@ -450,6 +451,103 @@ body.ro [data-act="edit"], body.ro [data-act="ok"], body.ro .review-row, body.ro
   </div>
 </div>
 
+<!-- SERVER MODE: outside claude.ai with window.SUFLER_API set (config.js) — templates and links live on the Google Apps Script server -->
+<script>
+(function(){
+  if (window.claude || !window.SUFLER_API) return;
+  const API = window.SUFLER_API;
+  const clone = o => o == null ? o : JSON.parse(JSON.stringify(o));
+  const ls = (k, v) => { try{ if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); }catch(_){ return null; } };
+  function deviceId(){ let id = ls("sufler.device"); if (!id){ id = "dev-" + Array.from(crypto.getRandomValues(new Uint32Array(3))).map(n=>n.toString(36)).join(""); ls("sufler.device", id); } return id; }
+
+  let templates = {}, links = {}, loaded = false, lastError = null;
+  const local = JSON.parse(ls("sufler.localdocs") || "{}"); // per-browser docs: favourites, usage
+  const listeners = new Set();
+  const meta = {fromCache:false, hasPendingWrites:false};
+  const shardSnap = () => { const docs = [{id:"s00", exists:true, data:()=>({items: clone(templates)}), metadata:meta}]; return {docs, size:1, empty:false, metadata:meta, docChanges:()=>[]}; };
+  const linksSnap = () => ({id:"links", exists:true, data:()=>({items: clone(links)}), metadata:meta});
+  const localSnap = p => ({id:p.split("/").pop(), exists: p in local, data:()=>clone(local[p]), metadata:meta});
+  function notify(){ for (const l of listeners){ try{ l.cb(l.kind === "shards" ? shardSnap() : l.kind === "links" ? linksSnap() : localSnap(l.path)); }catch(e){ console.error(e); } } }
+
+  async function pull(){
+    try{
+      const r = await fetch(API, {method:"GET", cache:"no-store"});
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || "server");
+      const t = {}; (j.templates||[]).forEach(x=>{ if (x && x.id) t[x.id] = x; });
+      const l = {}; (j.links||[]).forEach(x=>{ if (x && x.id) l[x.id] = x; });
+      templates = t; links = l; loaded = true; lastError = null; notify();
+    }catch(e){ lastError = e; console.warn("pull failed", e); if (!loaded){ loaded = true; notify(); } }
+  }
+  async function post(body){
+    const r = await fetch(API, {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body: JSON.stringify({...body, token: ls("sufler.token")})});
+    const j = await r.json();
+    if (!j.ok){ if (j.error === "auth"){ ls("sufler.token", null); ls("sufler.role", null); } throw {code: j.error === "auth" ? "invalid_argument" : "unavailable", message: j.error}; }
+    return j;
+  }
+  const ready = pull();
+  setInterval(()=>{ if (document.visibilityState === "visible") pull(); }, 20000);
+  document.addEventListener("visibilitychange", ()=>{ if (document.visibilityState === "visible") pull(); });
+
+  async function writeItems(kind, items, replace){
+    const map = kind === "links" ? links : templates;
+    for (const [id, val] of Object.entries(items || {})){
+      if (val === null){ delete map[id]; notify(); await post({action: kind === "links" ? "deleteLink" : "delete", id}); continue; }
+      const merged = replace ? {...clone(val), id} : Object.assign(map[id] || {id}, clone(val), {id});
+      map[id] = merged; notify();
+      await post({action: kind === "links" ? "saveLink" : "save", item: merged});
+    }
+  }
+  function docRef(path){
+    const isShard = path.startsWith("shards/"), isLinks = path === "meta/links";
+    return {
+      id: path.split("/").pop(), path,
+      async get(){ await ready; return isShard ? shardSnap().docs[0] : isLinks ? linksSnap() : localSnap(path); },
+      async set(d){ if (isShard || isLinks) return writeItems(isLinks ? "links" : "templates", d.items, true); local[path] = clone(d); ls("sufler.localdocs", JSON.stringify(local)); notify(); },
+      async update(d){
+        if (isShard || isLinks) return writeItems(isLinks ? "links" : "templates", d.items, false);
+        if (!(path in local)) throw {code:"invalid_argument"};
+        const m = (a,b)=>{ for (const k in b){ const v=b[k]; if (v && typeof v==="object" && !Array.isArray(v) && a[k] && typeof a[k]==="object") m(a[k],v); else a[k]=clone(v); } };
+        m(local[path], d); ls("sufler.localdocs", JSON.stringify(local)); notify();
+      },
+      async delete(){ delete local[path]; ls("sufler.localdocs", JSON.stringify(local)); notify(); },
+      async acquire(){ return {acquired:true}; },
+      onSnapshot(cb){ const l = {kind: isLinks ? "links" : "local", path, cb}; listeners.add(l); ready.then(()=>listeners.has(l) && cb(isLinks ? linksSnap() : localSnap(path))); return ()=>listeners.delete(l); },
+      collection(p){ return colRef(path + "/" + p); }
+    };
+  }
+  function colRef(path){
+    return {
+      path,
+      doc(id){ return docRef(path + "/" + (id || Math.random().toString(36).slice(2))); },
+      async get(){ await ready; return path === "shards" ? shardSnap() : {docs:[], size:0, empty:true}; },
+      onSnapshot(cb){ if (path !== "shards"){ cb({docs:[], size:0, empty:true, metadata:meta, docChanges:()=>[]}); return ()=>{}; } const l = {kind:"shards", path, cb}; listeners.add(l); ready.then(()=>listeners.has(l) && cb(shardSnap())); return ()=>listeners.delete(l); },
+      where(){ return this; }, orderBy(){ return this; }, limit(){ return this; }
+    };
+  }
+  window.__SUFLER_REMOTE = {
+    ready, deviceId,
+    get failed(){ return !!lastError && !Object.keys(templates).length; },
+    role: ()=> ls("sufler.token") ? ls("sufler.role") : null,
+    async login(password){
+      const r = await fetch(API, {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body: JSON.stringify({action:"login", password, device: deviceId()})});
+      const j = await r.json();
+      if (j.ok){ ls("sufler.token", j.token); ls("sufler.role", j.role); }
+      return j;
+    },
+    logout(){ ls("sufler.token", null); ls("sufler.role", null); },
+    whoami: ()=> post({action:"whoami"}),
+    passwords: ()=> post({action:"passwords"}),
+    release: label => post({action:"release", label}),
+    importAll: (templatesList, linksList) => post({action:"import", templates: templatesList, links: linksList}).then(r=>{ pull(); return r; }),
+    dump: ()=> ({templates: clone(templates), links: clone(links)}),
+    refresh: pull,
+  };
+  const user = { isOwner: async()=>false, canEdit: async()=>false, can: async()=>true, id: async()=>deviceId(), profiles: async()=>({}) };
+  window.claude = { use: async n => n === "db" ? {doc: docRef, collection: colRef} : n === "user" ? user : null };
+})();
+</script>
+
 <!-- LOCAL MODE: outside claude.ai (e.g. GitHub Pages) the page keeps its data in this browser (IndexedDB) -->
 <script>
 (function(){
@@ -507,6 +605,8 @@ body.ro [data-act="edit"], body.ro [data-act="ok"], body.ro .review-row, body.ro
 (() => {
 "use strict";
 const LOCAL = !!window.__SUFLER_LOCAL;
+const REMOTE = !!window.__SUFLER_REMOTE;
+const RS = window.__SUFLER_REMOTE;
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 const SHARDS = 24;
@@ -747,7 +847,7 @@ const queues = new Map();
 function enqueue(shard, fn){ const p=(queues.get(shard)||Promise.resolve()).then(fn).catch(err=>{console.error(err); toast("Не сохранилось: "+(err?.code||"ошибка")); }); queues.set(shard,p); return p; }
 function pickShard(){ let best=null,bs=Infinity; for(let i=0;i<SHARDS;i++){const id="s"+String(i).padStart(2,"0"); const s=shardSize.get(id)||0; if(s<bs){bs=s;best=id}} return best; }
 /* who is viewing: editors change shared templates; everyone keeps their own favourites/usage */
-const me = { canEdit:true, isOwner:true, uid:null };
+const me = { canEdit:true, isOwner:true, uid:null, isAdmin:false };
 let prefs = { fav:{}, uses:{} };
 function prefsRef(){ return db && me.uid ? db.doc("data/users/"+me.uid+"/prefs") : null; }
 function overlayPrefs(){
@@ -790,10 +890,17 @@ function applyRole(){
 /* ---------- entry gate: guest / editor with a personal password ---------- */
 let userApi = null, linksStarted = false;
 const PW_SALT = "sufler-v1:";
+/* who holds a password: the Claude account id, or — when the viewer does not tell us the account — this browser */
+function deviceId(){
+  let id = ls("sufler.device");
+  if (!id){ id = "dev-" + Array.from(crypto.getRandomValues(new Uint32Array(3))).map(n=>n.toString(36)).join(""); ls("sufler.device", id); }
+  return id;
+}
+function who(){ return me.uid || deviceId(); }
 async function pwHash(s){ const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(PW_SALT + s)); return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join(""); }
 function updateModeChip(){
   const c = $("#modeChip"); c.hidden = false;
-  c.textContent = me.isOwner ? "владелец" : (me.canEdit ? "редактор" : "гость");
+  c.textContent = me.isOwner ? "владелец" : (me.isAdmin ? "админ" : (me.canEdit ? "редактор" : "гость"));
   c.classList.toggle("ed", me.canEdit);
 }
 function setMode(mode, claim){
@@ -802,7 +909,8 @@ function setMode(mode, claim){
   $("#gate").hidden = true;
   updateModeChip(); applyRole();
   if (me.canEdit && !linksStarted){ linksStarted = true; initLinks(); }
-  if (me.isOwner) initPwPanel();
+  if (me.isOwner || (REMOTE && me.isAdmin)) initPwPanel();
+  if (REMOTE) $("#baseBox").hidden = !me.isAdmin;
   setView(view==="add"||view==="links" ? (me.canEdit?view:"search") : view);
 }
 function showGate(){
@@ -811,19 +919,26 @@ function showGate(){
 }
 async function startGate(){
   if (me.isOwner){ setMode("owner"); return; }
-  if (ls("sufler.mode")==="editor" && ls("sufler.claim") && db && me.uid){
+  if (REMOTE){
+    const role = RS.role();
+    if (role){ me.isAdmin = role === "admin"; setMode("editor");
+      RS.whoami().catch(()=>{ me.isAdmin = false; setMode("guest"); showGate(); toast("Вход редактора сброшен — введите пароль ещё раз"); });
+      return; }
+    me.canEdit = false; applyRole(); updateModeChip(); showGate(); return;
+  }
+  if (ls("sufler.mode")==="editor" && ls("sufler.claim") && db && who()){
     try{
       const s = await db.doc("claims/"+ls("sufler.claim")).get();
-      if (s.exists && s.data().uid === me.uid){ setMode("editor"); return; }
+      if (s.exists && s.data().uid === who()){ setMode("editor"); return; }
     }catch(_){}
   }
   me.canEdit = false; applyRole(); updateModeChip(); showGate();
 }
 $("#modeChip").onclick = ()=>{ if (!me.isOwner) showGate(); };
-$("#asGuest").onclick = ()=>setMode("guest");
+$("#asGuest").onclick = ()=>{ if (REMOTE){ RS.logout(); me.isAdmin = false; $("#pwPanel").hidden = true; } setMode("guest"); };
 $("#asEditor").onclick = ()=>{
   $("#gateChoose").hidden = true; $("#gatePw").hidden = false; $("#pwInput").value = "";
-  $("#pwErr").textContent = me.canWrite ? "" : "У вас доступ только для просмотра. Попросите владельца дать роль «Участник», затем введите пароль.";
+  $("#pwErr").textContent = (REMOTE || me.canWrite) ? "" : "Вы открыли Суфлёр по общей ссылке — так можно только искать и копировать. Чтобы стать редактором, попросите владельца добавить вашу почту (почту вашего аккаунта Claude) в «Поделиться» с ролью «Участник», обновите страницу и введите пароль.";
   $("#pwInput").focus();
 };
 $("#pwBack").onclick = ()=>{ $("#gatePw").hidden = true; $("#gateChoose").hidden = false; $("#asEditor").focus(); };
@@ -831,7 +946,18 @@ $("#gatePw").addEventListener("submit", async e=>{
   e.preventDefault();
   const pw = $("#pwInput").value.trim(); if (!pw) return;
   const err = m => { $("#pwErr").textContent = m; $("#pwInput").select(); };
-  if (!db || !me.uid) return err("Нет связи с хранилищем. Войдите в claude.ai и обновите страницу.");
+  if (REMOTE){
+    $("#pwGo").disabled = true;
+    try{
+      const r = await RS.login(pw);
+      if (!r.ok) return err(r.error === "taken" ? "Этот пароль уже занят другим человеком. Попросите у админа свой пароль." : r.error === "wrong" ? "Неверный пароль." : "Сервер не ответил, попробуйте ещё раз.");
+      me.isAdmin = r.role === "admin"; setMode("editor");
+      toast(me.isAdmin ? "Вы вошли как админ" : "Вы вошли как редактор");
+    }catch(_){ err("Нет связи с сервером. Проверьте интернет и попробуйте ещё раз."); }
+    finally{ $("#pwGo").disabled = false; }
+    return;
+  }
+  if (!db) return err("Нет связи с хранилищем. Войдите в claude.ai и обновите страницу.");
   $("#pwGo").disabled = true;
   try{
     const h = await pwHash(pw);
@@ -839,23 +965,30 @@ $("#gatePw").addEventListener("submit", async e=>{
     let s = await ref.get();
     if (!s.exists) return err("Неверный пароль.");
     let d = s.data() || {};
-    if (d.uid && d.uid !== me.uid) return err("Этот пароль уже занят другим человеком. Попросите у владельца свой пароль.");
+    if (d.uid && d.uid !== who()) return err("Этот пароль уже занят другим человеком. Попросите у владельца свой пароль.");
     if (!d.uid){
-      const lease = await ref.acquire({holder: me.uid, ttlMs: 5000});
+      const lease = await ref.acquire({holder: who(), ttlMs: 5000});
       if (!lease.acquired) return err("Кто-то входит с этим паролем прямо сейчас. Попробуйте через пару секунд.");
       s = await ref.get(); d = s.data() || {};
-      if (d.uid && d.uid !== me.uid) return err("Этот пароль уже занят другим человеком. Попросите у владельца свой пароль.");
-      await ref.update({uid: me.uid, at: Math.floor(Date.now()/1000)});
+      if (d.uid && d.uid !== who()) return err("Этот пароль уже занят другим человеком. Попросите у владельца свой пароль.");
+      await ref.update({uid: who(), at: Math.floor(Date.now()/1000)});
     }
     setMode("editor", h);
     toast("Вы вошли как редактор");
-  }catch(ex){ err(ex?.code==="invalid_argument" ? "Нет прав на запись. Попросите владельца дать роль «Участник»." : "Не получилось войти, попробуйте ещё раз."); }
+  }catch(ex){ err(ex?.code==="invalid_argument" ? "Пароль верный, но у вашего аккаунта нет права сохранять изменения. Попросите владельца добавить вашу почту в «Поделиться» с ролью «Участник», обновите страницу и войдите снова." : "Не получилось войти, попробуйте ещё раз."); }
   finally{ $("#pwGo").disabled = false; }
 });
 
 /* owner-only: who holds which password */
 let pwPanelStarted = false;
+async function loadRemotePw(){
+  try{
+    const r = await RS.passwords();
+    $("#pwRows").innerHTML = (r.list||[]).map(p=>`<div class="lrow" data-label="${esc(p.label)}"><span class="lc">${esc(p.label)}</span><span class="ln">${p.taken ? "занят" : "свободен"}<small>${p.taken && p.at ? "вошёл " + new Date(p.at).toLocaleDateString("ru-RU") : "ещё никто не входил"}</small></span><span class="lr" style="opacity:1">${p.taken ? '<button class="btn ghost" data-free="1">Освободить</button>' : ""}</span></div>`).join("") || '<div class="empty small">Паролей нет.</div>';
+  }catch(_){ $("#pwRows").innerHTML = '<div class="empty small">Не удалось загрузить список паролей.</div>'; }
+}
 function initPwPanel(){
+  if (REMOTE){ $("#pwPanel").hidden = false; loadRemotePw(); return; }
   if (pwPanelStarted || !db || LOCAL) return; pwPanelStarted = true;
   $("#pwPanel").hidden = false;
   db.collection("claims").onSnapshot(async snap=>{
@@ -868,6 +1001,7 @@ function initPwPanel(){
 }
 $("#pwRows").addEventListener("click", async e=>{
   const b = e.target.closest("[data-free]"); if(!b) return;
+  if (REMOTE){ try{ await RS.release(b.closest("[data-label]").dataset.label); toast("Пароль освобождён"); loadRemotePw(); }catch(_){ toast("Не получилось освободить"); } return; }
   const id = b.closest("[data-claim]").dataset.claim;
   try{ await db.doc("claims/"+id).update({uid:null, at:null}); toast("Пароль освобождён"); }catch(_){ toast("Не получилось освободить"); }
 });
@@ -924,9 +1058,9 @@ async function initDb(){
   await startGate();
   const timer = setTimeout(()=>{ if(!dbReady) setStatus("err","данные пока не загрузились…"); }, 10000);
   db.collection("shards").onSnapshot(snap=>{
-    if (!snap.metadata.fromCache){ dbReady = true; clearTimeout(timer); setStatus("ok", (LOCAL ? "локально · " : "") + `${items.size} шаблонов`); }
+    if (!snap.metadata.fromCache){ dbReady = true; clearTimeout(timer); setStatus("ok", (LOCAL ? "локально · " : REMOTE ? "сервер · " : "") + `${items.size} шаблонов`); }
     applyShards(snap);
-    if (dbReady) setStatus("ok", (LOCAL ? "локально · " : "") + `${items.size} шаблонов`);
+    if (dbReady) setStatus("ok", (LOCAL ? "локально · " : REMOTE ? "сервер · " : "") + `${items.size} шаблонов`);
   }, err=>{ clearTimeout(timer); dbReady=true; setStatus("err","ошибка хранилища: "+err.code); render(); });
 }
 
@@ -1251,10 +1385,44 @@ function readBaseFile(file, cb){
   r.onerror = () => cb(r.error || new Error("read"));
   r.readAsText(file);
 }
-if (LOCAL){
-  $("#baseBox").hidden = false; setFixLang("ru");
+if (LOCAL || REMOTE){
+  setFixLang("ru");
   $("#fixLang").hidden = true; $("#fixLang").previousElementSibling.hidden = true;
   $("#aiTags").hidden = true; $("#aiKz").hidden = true;
+}
+if (REMOTE){
+  $("#baseBox").querySelector("p").textContent = "Только для админа. Загрузка файла заменяет всю базу на сервере для всех. Скачайте копию перед заменой.";
+  $("#baseFile").addEventListener("change", e=>{
+    const f = e.target.files[0]; if(!f) return;
+    const r = new FileReader();
+    r.onload = async ()=>{
+      try{
+        const j = JSON.parse(r.result); const data = j && j.app === "sufler" ? j.data : j;
+        const tpl = [], lnk = [];
+        for (const [k, d] of Object.entries(data||{})){
+          if (k.startsWith("shards/") && d && d.items) for (const [id, t] of Object.entries(d.items)) if (t) tpl.push({...t, id});
+          if (k === "meta/links" && d && d.items) for (const [id, l] of Object.entries(d.items)) if (l) lnk.push({...l, id});
+        }
+        $("#baseNote").textContent = "Загружаю на сервер…";
+        const res = await RS.importAll(tpl, lnk);
+        $("#baseNote").textContent = `Готово: шаблонов ${res.templates}, ссылок ${res.links}. Прежняя база заменена.`;
+      }catch(_){ $("#baseNote").textContent = "Не удалось загрузить: нужен файл базы Суфлёра (.json) и вход админа."; }
+      e.target.value = "";
+    };
+    r.readAsText(f);
+  });
+  $("#baseExport").onclick = ()=>{
+    const d = RS.dump();
+    const data = {"shards/s00": {items: d.templates}, "meta/links": {items: d.links}};
+    const blob = new Blob([JSON.stringify({app:"sufler", version:1, exportedAt:new Date().toISOString(), data})], {type:"application/json"});
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = "sufler-base-" + new Date().toISOString().slice(0,10) + ".json";
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+    $("#baseNote").textContent = "Файл скачан.";
+  };
+}
+if (LOCAL){
+  $("#baseBox").hidden = false;
   $("#importFile").addEventListener("change", e=>{
     const f = e.target.files[0]; if(!f) return;
     readBaseFile(f, (err, n)=>{ if (err){ $("#importErr").textContent = "Не удалось прочитать файл. Нужен файл базы Суфлёра (.json)."; return; } hideImport(); toast(`Загружено шаблонов: ${n}`); });
