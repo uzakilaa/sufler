@@ -1,0 +1,1514 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>[hidden]{display:none!important}body{margin:0}</style>
+</head>
+<body>
+<title>Суфлёр оператора</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=Unbounded:wght@500;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: sticky command bar (search + section tabs) over a two-column body — block rail on the left, template cards on the right. Single deliberate dark look. */
+:root{
+  color-scheme: dark;
+  --bg:#15191b;
+  --panel:#1d2225;
+  --panel-2:#252b2f;
+  --line:#343c41;
+  --slate:#5a636a;
+  --fg:#e6e8e3;
+  --muted:#9ba39e;
+  --copper:#9e6752;
+  --copper-hi:#c48a72;
+  --copper-ink:#fff5ef;
+  --moss:#436850;
+  --moss-hi:#5f8d6e;
+  --sage:#adbc9f;
+  --warn:#d1a35c;
+  --danger:#c0675a;
+  --display:"Unbounded", "Segoe UI", system-ui, sans-serif;
+  --body:"Golos Text", "Segoe UI", system-ui, sans-serif;
+  --mono:"JetBrains Mono", Consolas, monospace;
+  --r:10px;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font:15px/1.5 var(--body);}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--panel)}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--sage);outline-offset:2px}
+.wrap{max-width:1280px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+/* top bar */
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--panel);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;gap:20px;padding-block:12px;flex-wrap:wrap}
+.brand{font-family:var(--display);font-weight:700;font-size:17px;letter-spacing:.01em;display:flex;align-items:center;gap:10px;white-space:nowrap}
+.brand i{width:12px;height:12px;border-radius:3px;background:var(--copper);display:inline-block;box-shadow:6px 6px 0 var(--moss)}
+nav.tabs{display:flex;gap:4px;background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:4px;overflow-x:auto;max-width:100%}
+nav.tabs button{border:0;background:none;padding:7px 14px;border-radius:999px;color:var(--muted);white-space:nowrap;font-weight:500;display:flex;gap:8px;align-items:center}
+nav.tabs button[aria-selected="true"]{background:var(--slate);color:var(--fg)}
+nav.tabs kbd{font:11px var(--mono);color:var(--muted);opacity:.8}
+.status{margin-left:auto;font:12px var(--mono);color:var(--muted);display:flex;align-items:center;gap:8px}
+.status .dot{width:8px;height:8px;border-radius:50%;background:var(--slate)}
+.status.ok .dot{background:var(--moss-hi)}
+.status.err .dot{background:var(--danger)}
+
+/* sections */
+section.view{padding-block:20px 60px}
+
+/* search */
+.searchbar{display:flex;gap:10px;align-items:stretch;margin-bottom:14px}
+.search{flex:1;min-width:0;position:relative}
+.search input{width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px 14px 46px;font-size:18px;outline:none}
+.search input:focus{border-color:var(--sage)}
+.search svg{position:absolute;left:15px;top:50%;transform:translateY(-50%);color:var(--muted)}
+.search .hint{position:absolute;right:14px;top:50%;transform:translateY(-50%);font:12px var(--mono);color:var(--muted);pointer-events:none}
+.filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.chip{border:1px solid var(--line);background:transparent;border-radius:999px;padding:5px 12px;font-size:13px;color:var(--muted);display:inline-flex;gap:6px;align-items:center}
+.chip b{font:500 11px var(--mono);color:var(--muted)}
+.chip[aria-pressed="true"]{border-color:var(--sage);color:var(--fg);background:color-mix(in srgb,var(--sage) 12%,transparent)}
+.chip.warn[aria-pressed="true"]{border-color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,transparent)}
+
+.cols{display:grid;grid-template-columns:230px minmax(0,1fr);gap:24px;align-items:start}
+aside.blocks{position:sticky;top:calc(env(safe-area-inset-top,0px) + 80px);max-height:calc(100vh - 100px);overflow:auto;padding-right:4px}
+aside h3{font:600 11px var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 8px 10px}
+aside ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
+aside li button{width:100%;text-align:left;border:0;background:none;padding:7px 10px;border-radius:8px;display:flex;justify-content:space-between;gap:8px;color:var(--muted)}
+aside li button:hover{background:var(--panel)}
+aside li button[aria-pressed="true"]{background:var(--panel-2);color:var(--fg);box-shadow:inset 3px 0 0 var(--copper)}
+aside li span:last-child{font:12px var(--mono);opacity:.7}
+aside .sep{height:1px;background:var(--line);margin:8px 10px}
+
+.meta-line{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--muted);margin-bottom:10px;gap:10px;flex-wrap:wrap}
+.results{display:flex;flex-direction:column;gap:10px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;display:flex;flex-direction:column;gap:8px;cursor:pointer;transition:border-color .12s, background .12s}
+.card:hover{border-color:var(--slate)}
+.card.sel{border-color:var(--sage);background:var(--panel-2)}
+.card.flash{border-color:var(--moss-hi);background:color-mix(in srgb,var(--moss) 22%,var(--panel))}
+.card-head{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.card-title{font-weight:600;font-size:15px;flex:1;min-width:0}
+.blk{font:500 11px var(--mono);color:var(--copper-hi);text-transform:lowercase;white-space:nowrap}
+.badge{font-size:11px;padding:1px 8px;border-radius:999px;border:1px solid var(--warn);color:var(--warn);white-space:nowrap}
+.card-body{white-space:pre-wrap;color:#cfd3cd;font-size:14px;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.card.open .card-body{display:block}
+.card-body mark{background:color-mix(in srgb,var(--sage) 30%,transparent);color:var(--fg);border-radius:2px}
+.card-foot{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.tag{font-size:12px;color:var(--sage);background:color-mix(in srgb,var(--sage) 9%,transparent);padding:1px 8px;border-radius:6px}
+.spacer{flex:1}
+.btn{border:1px solid var(--line);background:var(--panel-2);border-radius:8px;padding:5px 11px;font-size:13px;font-weight:500;display:inline-flex;gap:6px;align-items:center}
+.btn:hover{border-color:var(--slate)}
+.btn.primary{background:var(--copper);border-color:var(--copper);color:var(--copper-ink)}
+.btn.primary:hover{background:var(--copper-hi)}
+.btn.moss{background:var(--moss);border-color:var(--moss);color:#eef5ee}
+.btn.ghost{background:none;border-color:transparent;color:var(--muted)}
+.btn.ghost:hover{color:var(--fg)}
+.btn.danger{color:var(--danger)}
+.btn[disabled]{opacity:.5;cursor:default}
+.star[aria-pressed="true"]{color:var(--warn)}
+.date{font:11px var(--mono);color:var(--muted)}
+.empty{border:1px dashed var(--line);border-radius:var(--r);padding:28px;text-align:center;color:var(--muted)}
+.more{align-self:center;margin-top:8px}
+
+/* form */
+.form{display:grid;gap:14px;max-width:820px}
+.form h2,.tool h2{font:500 20px var(--display);margin:0 0 4px}
+.field{display:grid;gap:6px}
+.field label{font-size:13px;color:var(--muted);font-weight:500}
+.field input,.field textarea,.field select{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;outline:none;width:100%}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:var(--sage)}
+.field textarea{min-height:160px;resize:vertical;line-height:1.5}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.row-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.note{font-size:13px;color:var(--muted)}
+
+/* tools */
+.tool{display:grid;gap:14px}
+.tool-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.pane{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);display:flex;flex-direction:column;min-width:0}
+.pane-head{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);gap:8px;flex-wrap:wrap}
+.pane-head span{font:600 11px var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.pane textarea{flex:1;min-height:300px;background:transparent;border:0;outline:none;padding:14px;resize:vertical;font-size:16px;line-height:1.55}
+.pane .out{flex:1;min-height:300px;padding:14px;white-space:pre-wrap;font-size:16px;line-height:1.55;overflow-wrap:anywhere}
+.out ins{text-decoration:none;background:color-mix(in srgb,var(--moss-hi) 35%,transparent);border-radius:3px}
+.out .ph{color:var(--muted)}
+.pane-foot{display:flex;gap:8px;align-items:center;padding:10px 14px;border-top:1px solid var(--line);flex-wrap:wrap}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;background:none;padding:5px 12px;font-size:13px;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--slate);color:var(--fg)}
+.spin{width:12px;height:12px;border:2px solid var(--slate);border-top-color:var(--sage);border-radius:50%;animation:sp .8s linear infinite;display:inline-block}
+@keyframes sp{to{transform:rotate(360deg)}}
+kbd{font:11px var(--mono);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;color:var(--muted)}
+
+.tool-top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.tool-top-r{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pane textarea.editable{min-height:220px;background:color-mix(in srgb,var(--moss) 8%,transparent)}
+.pane textarea.editable:focus{background:color-mix(in srgb,var(--moss) 14%,transparent)}
+.fix-more{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:4px}
+h3.sub{font:500 14px var(--display);margin:0 0 10px;display:flex;gap:10px;align-items:baseline}
+h3.sub .note{font:400 12px var(--body)}
+.variants{display:flex;flex-direction:column;gap:8px}
+.variant{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;cursor:pointer;display:flex;flex-direction:column;gap:6px}
+.variant:hover{border-color:var(--slate)}
+.variant.flash{border-color:var(--moss-hi);background:color-mix(in srgb,var(--moss) 22%,var(--panel))}
+.v-head{display:flex;gap:8px;align-items:center}
+.v-style{font:500 11px var(--mono);color:var(--copper-hi);text-transform:lowercase}
+.v-text{white-space:pre-wrap;font-size:14px;color:#d5d9d3;overflow-wrap:anywhere}
+.variant.tpl .v-text{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.empty.small{padding:14px;font-size:13px}
+@media (max-width:860px){.fix-more{grid-template-columns:1fr}}
+.link-form{display:grid;grid-template-columns:140px 1fr 1fr 1fr;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin-bottom:18px}
+.lgroup{margin-bottom:22px}
+.lgroup h3{font:500 14px var(--display);margin:0 0 10px;color:var(--muted)}
+.lgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
+.lcard{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:flex;gap:12px;align-items:center;min-width:0}
+.lcard.sel{border-color:var(--sage)}
+.lcode{font:600 13px var(--mono);color:var(--copper-ink);background:var(--copper);border-radius:6px;padding:4px 8px;min-width:46px;text-align:center;text-transform:uppercase}
+.lmain{flex:1;min-width:0}
+.lname{font-weight:600}
+.lurl{font:12px var(--mono);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lnote{font-size:12px;color:var(--sage)}
+.lacts{display:flex;gap:4px}
+a.btn{text-decoration:none}
+.quick-links{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.quick-links a{display:inline-flex;gap:8px;align-items:center;border:1px solid var(--copper);border-radius:8px;padding:5px 10px;text-decoration:none;color:var(--fg);font-size:13px}
+.quick-links a b{font:600 11px var(--mono);color:var(--copper-hi);text-transform:uppercase}
+@media (max-width:860px){.link-form{grid-template-columns:1fr}.link-form .field{grid-column:auto!important}}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(20px);background:var(--moss);color:#eef5ee;padding:9px 18px;border-radius:999px;font-weight:500;opacity:0;transition:.18s;pointer-events:none;z-index:20}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+@media (max-width:860px){
+  .cols{grid-template-columns:1fr}
+  aside.blocks{position:static;max-height:none}
+  aside ul{flex-direction:row;overflow-x:auto;gap:4px;padding-bottom:4px}
+  aside li button{white-space:nowrap}
+  aside .sep{display:none}
+  .tool-grid,.row2{grid-template-columns:1fr}
+  .status{margin-left:0}
+  nav.tabs kbd{display:none}
+}
+/* ===== calmer layer: fewer borders, actions only on hover ===== */
+nav.tabs kbd{border:0;padding:0;opacity:.55}
+.vnum{font:600 11px var(--mono);color:var(--sage);border-color:color-mix(in srgb,var(--sage) 40%,transparent);padding:1px 6px;flex:none}
+.results{gap:6px}
+.card{border-color:transparent;background:var(--panel);padding:12px 16px;gap:6px}
+.card:hover{border-color:transparent;background:var(--panel-2)}
+.card.sel{border-color:transparent;background:var(--panel-2);box-shadow:inset 3px 0 0 var(--sage)}
+.card-head{align-items:center;flex-wrap:nowrap;gap:10px}
+.card-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:15px}
+.blk{color:var(--muted);font-size:11px}
+.newdot{width:7px;height:7px;border-radius:50%;background:var(--warn);flex:none}
+.card-body{-webkit-line-clamp:2;color:var(--muted);font-size:14px;line-height:1.5}
+.card.sel .card-body{-webkit-line-clamp:4;color:#d3d7d1}
+.card.open .card-body{display:block;color:#d3d7d1}
+.icons{display:flex;gap:2px;opacity:0;transition:opacity .12s;flex:none}
+.card:hover .icons,.card.sel .icons,.card:focus-within .icons{opacity:1}
+.card.is-fav .icons .star{opacity:1}
+.card.is-fav .icons{opacity:1}
+.card.is-fav:not(:hover):not(.sel) .icons .ic:not(.star){visibility:hidden}
+.ic{border:0;background:none;color:var(--muted);width:28px;height:28px;border-radius:6px;font-size:14px;display:inline-grid;place-items:center}
+.ic:hover{background:var(--line);color:var(--fg)}
+.ic.kz{font:600 11px var(--mono);width:auto;padding:0 7px;color:var(--sage)}
+.ic.star[aria-pressed="true"]{color:var(--warn)}
+.card.open .ic[data-act=open]{transform:rotate(180deg)}
+.review-row{display:flex;gap:8px;align-items:center}
+.quick-links:empty{display:none}
+.filters .chip{font-size:13px}
+aside li button{padding:6px 10px;font-size:14px}
+.meta-line .note kbd{margin:0 1px}
+
+/* entry gate */
+.gate{position:fixed;inset:0;z-index:30;background:var(--bg);display:grid;place-items:center;padding:24px max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px))}
+.gate-box{width:min(560px,100%);display:grid;gap:20px}
+.gate .brand{font-size:24px}
+.gate-q{font:500 18px var(--display);margin:0 0 12px}
+.gate-opts{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.gate-opt{text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:grid;gap:6px}
+.gate-opt:hover,.gate-opt:focus-visible{border-color:var(--sage);background:var(--panel-2)}
+.gate-opt b{font:600 17px var(--body)}
+.gate-opt span{font-size:13px;color:var(--muted)}
+#pwInput{width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-size:18px;outline:none;margin-bottom:6px}
+#pwInput:focus{border-color:var(--sage)}
+.gate-err{min-height:20px;margin:0 0 8px;font-size:13px;color:var(--danger)}
+.base-box{max-width:820px;margin-top:36px;padding-top:24px;border-top:1px solid var(--line);display:grid;gap:10px}
+.base-box h2{font:500 18px var(--display);margin:0}
+label.gate-opt{cursor:pointer}
+.mode-chip{border:1px solid var(--line);background:none;border-radius:999px;padding:4px 12px;font:500 12px var(--mono);color:var(--muted)}
+.mode-chip.ed{border-color:var(--copper);color:var(--copper-hi)}
+@media (max-width:560px){.gate-opts{grid-template-columns:1fr}}
+
+/* read-only viewers: copy and corrector only */
+body.ro [data-act="edit"], body.ro [data-act="ok"], body.ro .review-row, body.ro .kbnote{display:none!important}
+.kbnote{font-size:12px;color:var(--warn)}
+
+/* links: plain readable list */
+.lgroup{margin-bottom:28px;max-width:860px}
+.lgroup h3{font:600 11px var(--body);letter-spacing:.12em;text-transform:uppercase;margin:0 0 8px 12px}
+.lrows{display:flex;flex-direction:column;gap:2px}
+.lrow{display:grid;grid-template-columns:84px minmax(0,1fr) auto;align-items:center;gap:14px;padding:11px 12px;border-radius:8px;text-decoration:none;color:var(--fg)}
+.lrow:hover,.lrow.sel{background:var(--panel-2)}
+.lrow .lc{font:500 13px var(--mono);color:var(--copper-hi)}
+.lrow .ln{font-size:15px;font-weight:500;min-width:0}
+.lrow .ln small{display:block;font-size:12px;font-weight:400;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lrow .lr{display:flex;gap:2px;opacity:0}
+.lrow:hover .lr,.lrow:focus-within .lr{opacity:1}
+
+/* corrector: quieter extras */
+.variant{border-color:transparent;padding:10px 14px}
+.variant:hover{border-color:transparent;background:var(--panel-2)}
+.variant.ph-card{opacity:.55;cursor:default}
+.name-field{display:inline-flex;align-items:center;gap:8px}
+.name-field input{width:120px;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:5px 10px;outline:none;font-size:13px}
+.name-field input:focus{border-color:var(--sage)}
+.quick-head{font-size:12px;color:var(--muted);margin:0 0 2px}
+.variant .v-head .ic{opacity:0}
+.variant:hover .v-head .ic{opacity:1}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand"><i></i>Суфлёр</div>
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-view="search" aria-selected="true" title="Alt+Q">Шаблоны <kbd>Alt+Q</kbd></button>
+      <button role="tab" data-view="add" title="Alt+W">Добавить <kbd>Alt+W</kbd></button>
+      <button role="tab" data-view="fix" title="Alt+E">Корректор <kbd>Alt+E</kbd></button>
+      <button role="tab" data-view="links" title="Alt+R">Ссылки <kbd>Alt+R</kbd></button>
+    </nav>
+    <div class="status" id="status"><span class="dot"></span><span id="statusText">подключаюсь…</span></div>
+    <button class="mode-chip" id="modeChip" type="button" hidden title="Сменить режим">гость</button>
+  </div>
+</header>
+
+<main class="wrap">
+  <!-- SEARCH -->
+  <section class="view" id="v-search">
+    <div class="searchbar">
+      <div class="search">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="q" type="search" autocomplete="off" placeholder="кешбэк, возв, арест, есим…" aria-label="Поиск шаблонов">
+      </div>
+    </div>
+    <div class="filters" id="filters">
+      <button class="chip" data-f="all" aria-pressed="true">Все <b id="c-all">0</b></button>
+      <button class="chip" data-f="fav" aria-pressed="false">★ Избранное <b id="c-fav">0</b></button>
+      <button class="chip warn" data-f="new" aria-pressed="false">На проверку <b id="c-new">0</b></button>
+      <button class="chip" data-f="old" aria-pressed="false">Неактуально по БЗ <b id="c-old">0</b></button>
+      <span id="c-kz" hidden></span>
+    </div>
+    <div class="cols">
+      <aside class="blocks">
+        <h3>Блоки</h3>
+        <ul id="blockList"></ul>
+      </aside>
+      <div>
+        <div class="quick-links" id="quickLinks"></div>
+        <div class="meta-line"><span id="resInfo"></span><span class="note">клик — копировать · <kbd>↑</kbd><kbd>↓</kbd> <kbd>Enter</kbd></span></div>
+        <div class="results" id="results"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ADD / EDIT -->
+  <section class="view" id="v-add" hidden>
+    <form class="form" id="form">
+      <h2 id="formTitle">Новый шаблон</h2>
+      <div class="row2">
+        <div class="field"><label for="f-title">Название</label><input id="f-title" required placeholder="Кешбэк не пришёл — условия не выполнены"></div>
+        <div class="field"><label for="f-block">Блок</label>
+          <input id="f-block" list="blockOptions" required placeholder="кешбэк">
+          <datalist id="blockOptions"></datalist>
+        </div>
+      </div>
+      <div class="field"><label for="f-tags">Ключевые слова (через запятую)</label>
+        <div class="row-actions"><input id="f-tags" style="flex:1;min-width:0" placeholder="возв, возврат, вернуть деньги"><button type="button" class="btn" id="aiTags">Подобрать ИИ</button></div>
+      </div>
+      <div class="field"><label for="f-ru">Текст (RU)</label><textarea id="f-ru" required></textarea></div>
+      <div class="field"><label for="f-kz">Текст (KZ) — необязательно</label>
+        <textarea id="f-kz"></textarea>
+        <div class="row-actions"><button type="button" class="btn" id="aiKz">Перевести RU → KZ</button><span class="note" id="aiNote"></span></div>
+      </div>
+      <div class="row-actions">
+        <button class="btn primary" type="submit" id="saveBtn">Сохранить</button>
+        <button class="btn" type="button" id="cancelEdit" hidden>Отмена</button>
+        <span class="spacer"></span>
+        <button class="btn danger" type="button" id="delBtn" hidden>Удалить</button>
+        <button class="btn danger" type="button" id="delConfirm" hidden>Точно удалить?</button>
+      </div>
+      <p class="note"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> — сохранить.</p>
+    </form>
+    <div class="base-box" id="baseBox" hidden>
+      <h2>База шаблонов</h2>
+      <p class="note">Шаблоны хранятся в этом браузере. Скачайте файл, чтобы перенести базу на другой компьютер или отдать коллеге, и загрузите его там.</p>
+      <div class="row-actions">
+        <button class="btn primary" type="button" id="baseExport">Скачать базу (.json)</button>
+        <label class="btn" for="baseFile">Загрузить файл базы</label>
+        <input type="file" id="baseFile" accept=".json,application/json" hidden>
+        <span class="note" id="baseNote"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- FIX (corrector + translation) -->
+  <section class="view" id="v-fix" hidden>
+    <div class="tool">
+      <div class="tool-top">
+        <h2>Корректор</h2>
+        <div class="tool-top-r">
+          <span class="note daypart" id="dayPartNote" title="Приветствия и прощания подстраиваются под время суток"></span>
+          <label class="note name-field" for="opName">Ваше имя <input id="opName" autocomplete="off" placeholder="Илияс" maxlength="30"></label>
+          <span class="note">Ответ на языке:</span>
+          <div class="seg" id="fixLang"><button data-l="ru" aria-pressed="true">Русский</button><button data-l="kz" aria-pressed="false">Қазақша</button><button data-l="en" aria-pressed="false">English</button></div>
+        </div>
+      </div>
+      <div class="tool-grid">
+        <div class="pane">
+          <div class="pane-head"><span>Черновик</span><button class="btn ghost" id="fixClear">Очистить</button></div>
+          <textarea id="fixIn" placeholder="Пишите как удобно: «привет что тебе надо», «щас проверю подожди»… Справа будет готовый вежливый ответ"></textarea>
+        </div>
+        <div class="pane">
+          <div class="pane-head"><span id="fixLabel">Готовый ответ — можно править</span><span id="fixState" class="note"></span></div>
+          <textarea id="fixOut" class="editable" placeholder="Здесь появится готовый ответ. Его можно дописать: имя, номер заявки, сумму…"></textarea>
+          <div class="pane-foot"><button class="btn primary" id="fixCopy">Копировать</button><button class="btn" id="fixCopyBoth" hidden>RU + перевод</button><span class="note"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> — копировать</span><span class="spacer"></span><span class="note" id="fixSrc"></span></div>
+        </div>
+      </div>
+      <div class="fix-more">
+        <div>
+          <h3 class="sub">Другие варианты <span class="note">клик или <kbd>Alt</kbd>+цифра — копировать · ✎ — дописать</span></h3>
+          <div class="variants" id="variants"><div class="empty small">Варианты появятся, когда начнёте писать.</div></div>
+        </div>
+        <div>
+          <h3 class="sub">Похожие шаблоны из базы</h3>
+          <div class="variants" id="fixTpl"><div class="empty small">Подходящие шаблоны появятся здесь.</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- LINKS -->
+  <section class="view" id="v-links" hidden>
+    <div class="searchbar">
+      <div class="search">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="lq" type="search" autocomplete="off" placeholder="ч2д, фф, бз, tn, есим…" aria-label="Поиск ссылок">
+        <span class="hint">Enter — открыть первую</span>
+      </div>
+      <button class="btn ghost" id="linkAddBtn" type="button">+ Ссылка</button>
+    </div>
+    <form class="link-form" id="linkForm" hidden>
+      <div class="field"><label for="l-code">Сокращение</label><input id="l-code" placeholder="ч2д"></div>
+      <div class="field"><label for="l-name">Название</label><input id="l-name" required placeholder="Chat2Desk"></div>
+      <div class="field" style="grid-column:span 2"><label for="l-url">Адрес</label><input id="l-url" required type="url" placeholder="https://…"></div>
+      <div class="field"><label for="l-group">Раздел</label><select id="l-group"><option>Рабочие программы</option><option>Для клиентов</option></select></div>
+      <div class="field"><label for="l-note">Заметка</label><input id="l-note" placeholder="необязательно"></div>
+      <div class="row-actions" style="grid-column:1/-1"><button class="btn primary" type="submit">Сохранить</button><button class="btn" type="button" id="linkCancel">Отмена</button><span class="spacer"></span><button class="btn danger" type="button" id="linkDel" hidden>Удалить</button><button class="btn danger" type="button" id="linkDelOk" hidden>Точно удалить?</button></div>
+    </form>
+    <div id="linkGroups"></div>
+    <div class="lgroup" id="pwPanel" hidden>
+      <h3>Пароли редакторов — видно только владельцу</h3>
+      <div class="lrows" id="pwRows"></div>
+    </div>
+  </section>
+</main>
+<div class="toast" id="toast"></div>
+
+<!-- ENTRY GATE -->
+<div class="gate" id="gate" hidden>
+  <div class="gate-box">
+    <div class="brand"><i></i>Суфлёр</div>
+    <div id="gateChoose">
+      <p class="gate-q">Как войти?</p>
+      <div class="gate-opts">
+        <button class="gate-opt" id="asGuest" type="button"><b>Гость</b><span>Поиск и копирование шаблонов, корректор</span></button>
+        <button class="gate-opt" id="asEditor" type="button"><b>Редактор</b><span>Плюс добавление и правка шаблонов, ссылки</span></button>
+      </div>
+    </div>
+    <form id="gatePw" hidden>
+      <p class="gate-q">Пароль редактора</p>
+      <input id="pwInput" type="password" autocomplete="off" placeholder="Введите пароль" aria-label="Пароль редактора">
+      <p class="gate-err" id="pwErr"></p>
+      <div class="row-actions"><button class="btn primary" type="submit" id="pwGo">Войти</button><button class="btn ghost" type="button" id="pwBack">Назад</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- FIRST RUN (local mode): load a base file or start with examples -->
+<div class="gate" id="importGate" hidden>
+  <div class="gate-box">
+    <div class="brand"><i></i>Суфлёр</div>
+    <p class="gate-q">База шаблонов пока пустая</p>
+    <div class="gate-opts">
+      <label class="gate-opt" for="importFile"><b>Загрузить файл базы</b><span>Файл sufler-base.json, который вам передали</span></label>
+      <button class="gate-opt" id="importDemo" type="button"><b>Начать с примеров</b><span>Около 20 типовых ответов: приветствие, ожидание, наплыв, тикет в работе</span></button>
+    </div>
+    <input type="file" id="importFile" accept=".json,application/json" hidden>
+    <p class="gate-err" id="importErr"></p>
+  </div>
+</div>
+
+<!-- LOCAL MODE: outside claude.ai (e.g. GitHub Pages) the page keeps its data in this browser (IndexedDB) -->
+<script>
+(function(){
+  if (window.claude) return;
+  const DBNAME = "sufler", STORE = "kv";
+  let mem = {};
+  const listeners = new Set();
+  const clone = o => o == null ? o : JSON.parse(JSON.stringify(o));
+  let idbp = null;
+  function openIdb(){ return new Promise((res, rej)=>{ const r = indexedDB.open(DBNAME, 1); r.onupgradeneeded = ()=>r.result.createObjectStore(STORE); r.onsuccess = ()=>res(r.result); r.onerror = ()=>rej(r.error); }); }
+  async function load(){
+    try{ idbp = openIdb(); const d = await idbp; return await new Promise(res=>{ const q = d.transaction(STORE).objectStore(STORE).get("all"); q.onsuccess = ()=>res(q.result || {}); q.onerror = ()=>res({}); }); }
+    catch(e){ try{ return JSON.parse(localStorage.getItem("sufler.all") || "{}"); }catch(_){ return {}; } }
+  }
+  let saveT = null;
+  function save(){ clearTimeout(saveT); saveT = setTimeout(async ()=>{ try{ const d = await idbp; d.transaction(STORE, "readwrite").objectStore(STORE).put(mem, "all"); }catch(e){ try{ localStorage.setItem("sufler.all", JSON.stringify(mem)); }catch(_){} } }, 300); }
+  const ready = load().then(d=>{ mem = d || {}; });
+  function merge(a, b){ for (const k in b){ const v = b[k]; if (v && typeof v === "object" && !Array.isArray(v) && a[k] && typeof a[k] === "object" && !Array.isArray(a[k])) merge(a[k], v); else a[k] = clone(v); } return a; }
+  const meta = {fromCache:false, hasPendingWrites:false};
+  const docSnap = p => ({ id: p.split("/").pop(), exists: p in mem, data: ()=>clone(mem[p]), metadata: meta });
+  function colDocs(c){ const n = c.split("/").length + 1; return Object.keys(mem).filter(p=>p.startsWith(c + "/") && p.split("/").length === n).sort().map(docSnap); }
+  const qsnap = c => { const docs = colDocs(c); return {docs, size:docs.length, empty:!docs.length, metadata:meta, docChanges:()=>[]}; };
+  function notify(){ for (const l of listeners){ try{ l.cb(l.type === "doc" ? docSnap(l.path) : qsnap(l.path)); }catch(e){ console.error(e); } } }
+  function docRef(path){ return {
+    id: path.split("/").pop(), path,
+    async get(){ await ready; return docSnap(path); },
+    async set(d){ await ready; mem[path] = clone(d); save(); notify(); },
+    async update(d){ await ready; if (!(path in mem)) throw {code:"invalid_argument", message:"no such document"}; merge(mem[path], d); save(); notify(); },
+    async delete(){ await ready; delete mem[path]; save(); notify(); },
+    async acquire(){ return {acquired:true}; },
+    onSnapshot(cb){ const l = {type:"doc", path, cb}; listeners.add(l); ready.then(()=>listeners.has(l) && cb(docSnap(path))); return ()=>listeners.delete(l); },
+    collection(p){ return colRef(path + "/" + p); }
+  }; }
+  function colRef(path){ return {
+    path,
+    doc(id){ return docRef(path + "/" + (id || Math.random().toString(36).slice(2))); },
+    async add(d){ const r = this.doc(); await r.set(d); return r; },
+    async get(){ await ready; return qsnap(path); },
+    onSnapshot(cb){ const l = {type:"col", path, cb}; listeners.add(l); ready.then(()=>listeners.has(l) && cb(qsnap(path))); return ()=>listeners.delete(l); },
+    where(){ return this; }, orderBy(){ return this; }, limit(){ return this; }
+  }; }
+  const localDb = { doc: docRef, collection: colRef };
+  const localUser = { isOwner: async()=>true, canEdit: async()=>true, can: async()=>true, id: async()=>"local", profiles: async()=>({}) };
+  window.__SUFLER_LOCAL = {
+    ready,
+    dump: ()=>clone(mem),
+    replace: obj=>{ mem = clone(obj) || {}; save(); notify(); },
+    isEmpty: ()=>!Object.keys(mem).some(p=>p.startsWith("shards/")),
+  };
+  window.claude = { use: async n => n === "db" ? localDb : n === "user" ? localUser : null };
+})();
+</script>
+
+<script>
+(() => {
+"use strict";
+const LOCAL = !!window.__SUFLER_LOCAL;
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const SHARDS = 24;
+const DEFAULT_BLOCKS = ["приветствие","первый ответ","ожидание","наплыв","уточняющие вопросы","передано специалистам","тикет в работе","клиент молчит","прощание"];
+const VIEWS = ["search","add","fix","links"];
+
+/* ---------- time of day: greetings and farewells that match the clock ---------- */
+const PART_NAME = {morning:"утро", day:"день", evening:"вечер", night:"ночь"};
+const GREET = {
+  ru:{morning:"Доброе утро", day:"Добрый день", evening:"Добрый вечер", night:"Здравствуйте"},
+  kz:{morning:"Қайырлы таң", day:"Қайырлы күн", evening:"Қайырлы кеш", night:"Сәлеметсіз бе"},
+  en:{morning:"Good morning", day:"Good afternoon", evening:"Good evening", night:"Hello"},
+};
+const BYE = {
+  ru:{morning:"Хорошего дня", day:"Хорошего дня", evening:"Хорошего вечера", night:"Доброй ночи"},
+  kz:{morning:"Күніңіз сәтті өтсін", day:"Күніңіз сәтті өтсін", evening:"Кешіңіз сәтті өтсін", night:"Қайырлы түн"},
+  en:{morning:"Have a great day", day:"Have a great day", evening:"Have a nice evening", night:"Have a good night"},
+};
+function dayPart(d){ const h = (d||new Date()).getHours(); return h>=5 && h<12 ? "morning" : h>=12 && h<18 ? "day" : h>=18 && h<23 ? "evening" : "night"; }
+/* swap time-specific greeting at the start and farewell at the end so they match the current time */
+function fitTime(text, lang){
+  if (!text) return text;
+  const p = dayPart();
+  let t = text;
+  if (lang === "kz"){
+    t = t.replace(/^(\s*)Қайырлы (таң|күн|кеш|түн)(?=[!,.\s])/i, (m,sp)=>sp+GREET.kz[p]);
+    t = t.replace(/(Күніңіз|Кешіңіз) сәтті өтсін|Қайырлы түн(?=[!.\s]*$)/g, (m, _a, off)=> off > t.length-90 ? BYE.kz[p] : m);
+    return t;
+  }
+  t = t.replace(/^(\s*)(Доброе утро|Добрый день|Добрый вечер|Доброй ночи)(?=[!,.\s])/i, (m,sp)=>sp+GREET.ru[p]);
+  t = t.replace(/Хорошего (дня|вечера)|Доброй ночи|Спокойной ночи/g, (m, _a, off)=> off > t.length-90 ? BYE.ru[p] : m);
+  return t;
+}
+let links = new Map(); // id -> {code,name,url,group,note}
+
+/* ---------- state ---------- */
+let db = null, sample = null;
+let items = new Map();          // id -> template
+let shardOf = new Map();        // id -> shard id
+let shardSize = new Map();      // shard id -> approx bytes
+let view = "search", filter = "all", block = null, sel = 0, shown = 40;
+let editingId = null;
+
+/* ---------- helpers ---------- */
+const norm = s => (s||"").toLowerCase().replace(/ё/g,"е").replace(/э/g,"е").replace(/[«»"“”„'`]/g,"");
+const words = s => norm(s).split(/[^a-zа-я0-9әғқңөұүһі]+/i).filter(Boolean);
+const esc = s => (s||"").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove("show"),1400);}
+function ls(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){return null}}
+async function copy(text){
+  try{await navigator.clipboard.writeText(text);return true}
+  catch(e){const ta=document.createElement("textarea");ta.value=text;document.body.appendChild(ta);ta.select();let ok=false;try{ok=document.execCommand("copy")}catch(_){}ta.remove();return ok}
+}
+function setStatus(kind,text){const s=$("#status");s.className="status "+(kind||"");$("#statusText").textContent=text;}
+
+/* ---------- search index ---------- */
+let index = []; // {id, w:Set(words of title/tags/block), body:Array words}
+function rebuildIndex(){
+  vocabDirty = true;
+  index = [];
+  for (const [id,t] of items){
+    const head = new Set([...words(t.title), ...(t.tags||[]).flatMap(words), ...words(t.block)]);
+    const body = new Set([...words(t.ru), ...words(t.kz)]);
+    index.push({id, head:[...head], body:[...body]});
+  }
+}
+function lev1(a,b){ // edit distance <=1 ?
+  if (Math.abs(a.length-b.length)>1) return false;
+  let i=0,j=0,d=0;
+  while(i<a.length&&j<b.length){ if(a[i]===b[j]){i++;j++;continue} if(++d>1)return false; if(a.length>b.length)i++; else if(b.length>a.length)j++; else{i++;j++} }
+  return d + (a.length-i) + (b.length-j) <= 1;
+}
+function tokScore(tok, list, weight){
+  let best = 0;
+  for (const w of list){
+    if (w===tok){best=Math.max(best,3*weight);break}
+    if (w.startsWith(tok)) best=Math.max(best,2*weight);
+    else if (tok.length>=4 && w.length>=4){
+      if (lev1(tok, w.slice(0, tok.length)) || lev1(tok,w)) best=Math.max(best,1*weight);
+      else if (tok.length>=6 && w.startsWith(tok.slice(0,tok.length-2))) best=Math.max(best,1*weight);
+    }
+  }
+  return best;
+}
+function search(q){
+  const toks = words(q);
+  let pool = index;
+  const out = [];
+  for (const e of pool){
+    const t = items.get(e.id); if(!t) continue;
+    if (block && t.block!==block) continue;
+    if (filter==="fav" && !t.fav) continue;
+    if (filter==="new" && t.status!=="new") continue;
+    if (filter==="old" ? t.status!=="old" : t.status==="old") continue;
+    if (filter==="kz" && !t.kz) continue;
+    let score = 0, ok = true;
+    for (const tok of toks){
+      const s = Math.max(tokScore(tok,e.head,3), tokScore(tok,e.body,1));
+      if (!s){ok=false;break}
+      score += s;
+    }
+    if (!ok) continue;
+    score += Math.min(t.uses||0, 30)/10 + (t.fav?2:0);
+    out.push({t, score});
+  }
+  if (filter==="top") out.sort((a,b)=>(b.t.uses||0)-(a.t.uses||0));
+  else if (toks.length) out.sort((a,b)=>b.score-a.score || (b.t.date||0)-(a.t.date||0));
+  else out.sort((a,b)=>(b.t.fav?1:0)-(a.t.fav?1:0) || (b.t.uses||0)-(a.t.uses||0) || (b.t.date||0)-(a.t.date||0));
+  return {list: out.map(o=>o.t), toks};
+}
+function highlight(text, toks){
+  let h = esc(text);
+  if (!toks.length) return h;
+  const parts = toks.filter(t=>t.length>=2).map(t=>t.replace(/[.*+?^${}()|[\]\\]/g,"\\$&").replace(/е/g,"[еёэ]"));
+  if (!parts.length) return h;
+  const re = new RegExp("(^|[^a-zа-яё0-9әғқңөұүһі])(" + parts.join("|") + ")", "giu");
+  return h.replace(re, "$1<mark>$2</mark>");
+}
+
+/* ---------- render ---------- */
+let current = [];
+function renderBlocks(){
+  const counts = new Map();
+  for (const t of items.values()) counts.set(t.block, (counts.get(t.block)||0)+1);
+  for (const b of DEFAULT_BLOCKS) if(!counts.has(b)) counts.set(b,0);
+  const def = DEFAULT_BLOCKS.filter(b=>counts.has(b));
+  const rest = [...counts.keys()].filter(b=>!DEFAULT_BLOCKS.includes(b)).sort((a,b)=>a.localeCompare(b,"ru"));
+  const li = (b,label,n) => `<li><button data-b="${esc(b??"")}" aria-pressed="${block===b}"><span>${esc(label)}</span><span>${n}</span></button></li>`;
+  $("#blockList").innerHTML = li(null,"Все блоки",items.size) + def.map(b=>li(b,b,counts.get(b))).join("") + '<li class="sep"></li>' + rest.map(b=>li(b,b,counts.get(b))).join("");
+  $("#blockOptions").innerHTML = [...counts.keys()].map(b=>`<option value="${esc(b)}">`).join("");
+  let fav=0,nw=0,kz=0,old=0; for(const t of items.values()){ if(t.fav)fav++; if(t.status==="new")nw++; if(t.status==="old")old++; if(t.kz)kz++; }
+  $("#c-old").textContent=old;
+  $("#c-all").textContent=items.size; $("#c-fav").textContent=fav; $("#c-new").textContent=nw; $("#c-kz").textContent=kz;
+}
+function fmtDate(ts){ if(!ts) return ""; const d=new Date(ts*1000); return d.toLocaleDateString("ru-RU",{day:"2-digit",month:"2-digit",year:"2-digit"}); }
+function renderResults(){
+  const q = $("#q").value;
+  const {list, toks} = search(q);
+  current = list;
+  if (sel >= list.length) sel = 0;
+  const lm = toks.length ? matchLinks(q).slice(0,4) : [];
+  $("#quickLinks").innerHTML = lm.map(l=>`<a href="${esc(l.url)}" target="_blank" rel="noopener"><b>${esc(l.code||"↗")}</b>${esc(l.name)}</a>`).join("");
+  const slice = list.slice(0, shown);
+  $("#resInfo").textContent = items.size ? `Найдено: ${list.length}${block? " · блок «"+block+"»":""}` : "";
+  if (!items.size){
+    $("#results").innerHTML = `<div class="empty">${dbReady ? "Шаблонов пока нет. Откройте «Добавить» (Alt+2), чтобы создать первый." : "Загружаю шаблоны…"}</div>`;
+    return;
+  }
+  if (!list.length){ $("#results").innerHTML = `<div class="empty">Ничего не нашлось по «${esc(q)}». Попробуйте короче: «возв», «кеш», «арест».</div>`; return; }
+  const reviewing = filter==="new";
+  $("#results").innerHTML = slice.map((t,i)=>`
+    <article class="card${i===sel?" sel":""}${t.fav?" is-fav":""}" data-id="${t.id}" data-i="${i}" title="Клик — скопировать${t.kz?" · Shift+клик — KZ":""}">
+      <div class="card-head">
+        ${t.status==="new"?'<span class="newdot" title="Не проверен"></span>':""}
+        <span class="card-title">${highlight(t.title,toks)}</span>
+        <span class="blk">${esc(t.block)}</span>
+        <span class="icons">
+          ${t.kz?'<button class="ic kz" data-act="kz" title="Скопировать на казахском">KZ</button>':""}
+          <button class="ic star" data-act="fav" aria-pressed="${!!t.fav}" title="${t.fav?"Убрать из избранного":"В избранное"}">★</button>
+          <button class="ic" data-act="edit" title="Изменить">✎</button>
+          <button class="ic" data-act="open" title="Показать целиком">⌄</button>
+        </span>
+      </div>
+      <div class="card-body">${highlight(t.ru,toks)}</div>
+      ${t.kb && (reviewing || filter==="old") ? `<div class="kbnote">${t.status==="old" ? "Расходится с БЗ" : "Похоже на статью"} «${esc(t.kb.art||"")}»${t.kb.missing&&t.kb.missing.length?` — в статье нет: ${esc(t.kb.missing.join(", "))}`:""}</div>`:""}
+      ${reviewing?`<div class="review-row"><button class="btn moss" data-act="ok">Актуально</button><button class="btn" data-act="edit">Изменить</button><span class="date">из ТГ ${fmtDate(t.date)}</span></div>`:""}
+      ${filter==="old"?`<div class="review-row"><button class="btn moss" data-act="ok">Всё же актуально</button><button class="btn" data-act="edit">Изменить</button><span class="spacer"></span><button class="btn danger" data-act="del">Удалить</button><button class="btn danger" data-act="delok" hidden>Точно удалить?</button></div>`:""}
+    </article>`).join("") + (list.length>shown?`<button class="btn more" id="more">Показать ещё (${list.length-shown})</button>`:"");
+}
+function render(){ renderBlocks(); renderResults(); }
+
+/* ---------- actions ---------- */
+async function doCopy(t, lang){
+  const text = fitTime(lang==="kz" && t.kz ? t.kz : t.ru, lang==="kz" && t.kz ? "kz" : "ru");
+  const ok = await copy(text);
+  toast(ok ? (lang==="kz"?"Скопировано KZ":"Скопировано") : "Не удалось скопировать — выделите текст вручную");
+  const el = document.querySelector(`.card[data-id="${t.id}"]`);
+  if (el){ el.classList.add("flash"); setTimeout(()=>el.classList.remove("flash"),500); }
+  countUse(t.id);
+}
+$("#results").addEventListener("click", e=>{
+  if (e.target.id==="more"){ shown+=40; renderResults(); return; }
+  const card = e.target.closest(".card"); if(!card) return;
+  const t = items.get(card.dataset.id); if(!t) return;
+  const act = e.target.closest("[data-act]")?.dataset.act;
+  if (window.getSelection && String(window.getSelection()).length > 3 && !act) return; // user is selecting text
+  sel = +card.dataset.i;
+  if (act==="open"){ card.classList.toggle("open"); return; }
+  if (act==="fav"){ toggleFav(t.id); return; }
+  if (act==="edit"){ openEdit(t.id); return; }
+  if (act==="ok"){ patch(t.id,{status:"ok"}); toast("Отмечено как актуальное"); return; }
+  if (act==="del"){ e.target.hidden=true; card.querySelector('[data-act="delok"]').hidden=false; return; }
+  if (act==="delok"){ if(me.canEdit){ removeTemplate(t.id); toast("Шаблон удалён"); } return; }
+  doCopy(t, act==="kz" || (!act && e.shiftKey) ? "kz" : "ru");
+});
+$("#blockList").addEventListener("click", e=>{
+  const b = e.target.closest("button"); if(!b) return;
+  block = b.dataset.b || null; sel=0; shown=40; render(); $("#q").focus();
+});
+$("#filters").addEventListener("click", e=>{
+  const c = e.target.closest(".chip"); if(!c) return;
+  filter = c.dataset.f; $$("#filters .chip").forEach(x=>x.setAttribute("aria-pressed", x===c)); sel=0; shown=40; renderResults(); $("#q").focus();
+});
+let qT; $("#q").addEventListener("input", ()=>{ clearTimeout(qT); qT=setTimeout(()=>{sel=0;shown=40;renderResults();},60); });
+$("#q").addEventListener("keydown", e=>{
+  if (e.key==="ArrowDown"){ e.preventDefault(); sel=Math.min(sel+1, Math.min(current.length,shown)-1); markSel(); }
+  else if (e.key==="ArrowUp"){ e.preventDefault(); sel=Math.max(sel-1,0); markSel(); }
+  else if (e.key==="Enter"){ e.preventDefault(); const t=current[sel]; if(t) doCopy(t, e.shiftKey?"kz":"ru"); }
+  else if (e.key==="Escape"){ $("#q").value=""; sel=0; renderResults(); }
+});
+function markSel(){ $$(".card").forEach(c=>c.classList.toggle("sel", +c.dataset.i===sel)); document.querySelector(".card.sel")?.scrollIntoView({block:"nearest"}); }
+
+/* ---------- views ---------- */
+function setView(v){
+  view = v;
+  $$("nav.tabs button").forEach(b=>b.setAttribute("aria-selected", b.dataset.view===v));
+  VIEWS.forEach(x=>$("#v-"+x).hidden = x!==v);
+  ls("sufler.view", v);
+  if (v==="links") renderLinks();
+  const focusEl = {search:"#q", add:"#f-title", fix:"#fixIn", links:"#lq"}[v];
+  requestAnimationFrame(()=>{ const el=$(focusEl); el.focus(); if(el.setSelectionRange && el.value) el.setSelectionRange(el.value.length, el.value.length); });
+}
+$$("nav.tabs button").forEach(b=>b.addEventListener("click", ()=>{ if(b.dataset.view==="add" && view!=="add") resetForm(); setView(b.dataset.view); }));
+document.addEventListener("keydown", e=>{
+  const SEC = {KeyQ:0, KeyW:1, KeyE:2, KeyR:3};
+  if (e.altKey && !e.ctrlKey && e.code in SEC){ e.preventDefault(); const v=VIEWS[SEC[e.code]]; if(v==="add"&&view!=="add") resetForm(); setView(v); }
+  else if (e.altKey && !e.ctrlKey && /^Digit[1-9]$/.test(e.code) && view==="fix"){ e.preventDefault(); copyVariant(+e.code.slice(5)-1); }
+  else if (e.key==="/" && view==="search" && document.activeElement!==$("#q") && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)){ e.preventDefault(); $("#q").focus(); }
+  else if (e.ctrlKey && e.key==="Enter"){
+    if (view==="fix"){ e.preventDefault(); $("#fixCopy").click(); }
+    if (view==="add"){ e.preventDefault(); $("#form").requestSubmit(); }
+  }
+});
+
+/* ---------- storage (db shards) ---------- */
+let dbReady = false;
+const queues = new Map();
+function enqueue(shard, fn){ const p=(queues.get(shard)||Promise.resolve()).then(fn).catch(err=>{console.error(err); toast("Не сохранилось: "+(err?.code||"ошибка")); }); queues.set(shard,p); return p; }
+function pickShard(){ let best=null,bs=Infinity; for(let i=0;i<SHARDS;i++){const id="s"+String(i).padStart(2,"0"); const s=shardSize.get(id)||0; if(s<bs){bs=s;best=id}} return best; }
+/* who is viewing: editors change shared templates; everyone keeps their own favourites/usage */
+const me = { canEdit:true, isOwner:true, uid:null };
+let prefs = { fav:{}, uses:{} };
+function prefsRef(){ return db && me.uid ? db.doc("data/users/"+me.uid+"/prefs") : null; }
+function overlayPrefs(){
+  for (const [id,t] of items){
+    t.fav = id in prefs.fav ? !!prefs.fav[id] : (me.isOwner ? !!t._fav0 : false);
+    t.uses = (prefs.uses[id]||0) + (me.isOwner ? (t._uses0||0) : 0);
+  }
+}
+function writePrefs(part){
+  const ref = prefsRef(); if (!ref) return;
+  enqueue("prefs", async ()=>{ try{ await ref.update(part); }catch(e){ if(e?.code==="invalid_argument"){ try{ await ref.set({fav:{},uses:{},...part}); }catch(_){ /* view-only: keep it local */ } } } });
+}
+function toggleFav(id){
+  const t = items.get(id); if(!t) return;
+  prefs.fav[id] = !t.fav; t.fav = !t.fav; render();
+  writePrefs({fav:{[id]:t.fav}});
+}
+function countUse(id){
+  const t = items.get(id); if(!t) return;
+  prefs.uses[id] = (prefs.uses[id]||0)+1; t.uses = (t.uses||0)+1; renderBlocks();
+  writePrefs({uses:{[id]:prefs.uses[id]}});
+}
+function patch(id, fields, quiet){
+  const t = items.get(id); if(!t || !me.canEdit) return;
+  Object.assign(t, fields);
+  if (!quiet) render(); else renderBlocks();
+  const shard = shardOf.get(id);
+  if (!db || !shard) return;
+  enqueue(shard, ()=>db.doc("shards/"+shard).update({items:{[id]:fields}}));
+}
+function applyRole(){
+  document.body.classList.toggle("ro", !me.canEdit);
+  $('nav.tabs button[data-view="add"]').hidden = !me.canEdit;
+  $('nav.tabs button[data-view="links"]').hidden = !me.canEdit;
+  $('#filters .chip[data-f="new"]').hidden = !me.canEdit;
+  $('#filters .chip[data-f="old"]').hidden = !me.canEdit;
+  if (!me.canEdit && (view==="add" || view==="links")) setView("search");
+  render();
+}
+/* ---------- entry gate: guest / editor with a personal password ---------- */
+let userApi = null, linksStarted = false;
+const PW_SALT = "sufler-v1:";
+async function pwHash(s){ const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(PW_SALT + s)); return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join(""); }
+function updateModeChip(){
+  const c = $("#modeChip"); c.hidden = false;
+  c.textContent = me.isOwner ? "владелец" : (me.canEdit ? "редактор" : "гость");
+  c.classList.toggle("ed", me.canEdit);
+}
+function setMode(mode, claim){
+  me.canEdit = mode==="editor" || mode==="owner";
+  ls("sufler.mode", mode); if (claim) ls("sufler.claim", claim);
+  $("#gate").hidden = true;
+  updateModeChip(); applyRole();
+  if (me.canEdit && !linksStarted){ linksStarted = true; initLinks(); }
+  if (me.isOwner) initPwPanel();
+  setView(view==="add"||view==="links" ? (me.canEdit?view:"search") : view);
+}
+function showGate(){
+  $("#gate").hidden = false; $("#gateChoose").hidden = false; $("#gatePw").hidden = true; $("#pwErr").textContent = "";
+  requestAnimationFrame(()=>$("#asGuest").focus());
+}
+async function startGate(){
+  if (me.isOwner){ setMode("owner"); return; }
+  if (ls("sufler.mode")==="editor" && ls("sufler.claim") && db && me.uid){
+    try{
+      const s = await db.doc("claims/"+ls("sufler.claim")).get();
+      if (s.exists && s.data().uid === me.uid){ setMode("editor"); return; }
+    }catch(_){}
+  }
+  me.canEdit = false; applyRole(); updateModeChip(); showGate();
+}
+$("#modeChip").onclick = ()=>{ if (!me.isOwner) showGate(); };
+$("#asGuest").onclick = ()=>setMode("guest");
+$("#asEditor").onclick = ()=>{
+  $("#gateChoose").hidden = true; $("#gatePw").hidden = false; $("#pwInput").value = "";
+  $("#pwErr").textContent = me.canWrite ? "" : "У вас доступ только для просмотра. Попросите владельца дать роль «Участник», затем введите пароль.";
+  $("#pwInput").focus();
+};
+$("#pwBack").onclick = ()=>{ $("#gatePw").hidden = true; $("#gateChoose").hidden = false; $("#asEditor").focus(); };
+$("#gatePw").addEventListener("submit", async e=>{
+  e.preventDefault();
+  const pw = $("#pwInput").value.trim(); if (!pw) return;
+  const err = m => { $("#pwErr").textContent = m; $("#pwInput").select(); };
+  if (!db || !me.uid) return err("Нет связи с хранилищем. Войдите в claude.ai и обновите страницу.");
+  $("#pwGo").disabled = true;
+  try{
+    const h = await pwHash(pw);
+    const ref = db.doc("claims/"+h);
+    let s = await ref.get();
+    if (!s.exists) return err("Неверный пароль.");
+    let d = s.data() || {};
+    if (d.uid && d.uid !== me.uid) return err("Этот пароль уже занят другим человеком. Попросите у владельца свой пароль.");
+    if (!d.uid){
+      const lease = await ref.acquire({holder: me.uid, ttlMs: 5000});
+      if (!lease.acquired) return err("Кто-то входит с этим паролем прямо сейчас. Попробуйте через пару секунд.");
+      s = await ref.get(); d = s.data() || {};
+      if (d.uid && d.uid !== me.uid) return err("Этот пароль уже занят другим человеком. Попросите у владельца свой пароль.");
+      await ref.update({uid: me.uid, at: Math.floor(Date.now()/1000)});
+    }
+    setMode("editor", h);
+    toast("Вы вошли как редактор");
+  }catch(ex){ err(ex?.code==="invalid_argument" ? "Нет прав на запись. Попросите владельца дать роль «Участник»." : "Не получилось войти, попробуйте ещё раз."); }
+  finally{ $("#pwGo").disabled = false; }
+});
+
+/* owner-only: who holds which password */
+let pwPanelStarted = false;
+function initPwPanel(){
+  if (pwPanelStarted || !db || LOCAL) return; pwPanelStarted = true;
+  $("#pwPanel").hidden = false;
+  db.collection("claims").onSnapshot(async snap=>{
+    const rows = snap.docs.map(d=>({id:d.id, ...(d.data()||{})})).sort((a,b)=>String(a.label).localeCompare(String(b.label),"ru"));
+    let names = {};
+    const ids = rows.map(r=>r.uid).filter(Boolean);
+    if (ids.length && userApi?.profiles){ try{ names = await userApi.profiles(ids) || {}; }catch(_){} }
+    $("#pwRows").innerHTML = rows.map(r=>`<div class="lrow" data-claim="${esc(r.id)}"><span class="lc">${esc(r.label||"пароль")}</span><span class="ln">${r.uid ? esc(names[r.uid]?.name || "занят") : "свободен"}<small>${r.uid && r.at ? "вошёл "+fmtDate(r.at) : "ещё никто не входил"}</small></span><span class="lr" style="opacity:1">${r.uid?'<button class="btn ghost" data-free="1">Освободить</button>':""}</span></div>`).join("") || '<div class="empty small">Паролей пока нет.</div>';
+  }, ()=>{});
+}
+$("#pwRows").addEventListener("click", async e=>{
+  const b = e.target.closest("[data-free]"); if(!b) return;
+  const id = b.closest("[data-claim]").dataset.claim;
+  try{ await db.doc("claims/"+id).update({uid:null, at:null}); toast("Пароль освобождён"); }catch(_){ toast("Не получилось освободить"); }
+});
+
+async function saveTemplate(t){
+  if (!me.canEdit) return;
+  let shard = shardOf.get(t.id);
+  const isNew = !shard;
+  if (isNew){ shard = pickShard(); shardOf.set(t.id, shard); }
+  items.set(t.id, t); rebuildIndex(); render();
+  if (!db) { toast("Хранилище недоступно — шаблон не сохранится после перезагрузки"); return; }
+  shardSize.set(shard, (shardSize.get(shard)||0) + JSON.stringify(t).length*2);
+  await enqueue(shard, async ()=>{
+    const ref = db.doc("shards/"+shard);
+    try { await ref.update({items:{[t.id]:t}}); }
+    catch(e){ if (e?.code==="invalid_argument") await ref.set({items:{[t.id]:t}}); else throw e; }
+  });
+}
+function removeTemplate(id){
+  const shard = shardOf.get(id);
+  items.delete(id); shardOf.delete(id); rebuildIndex(); render();
+  if (db && shard) enqueue(shard, ()=>db.doc("shards/"+shard).update({items:{[id]:null}}));
+}
+function applyShards(snap){
+  const next = new Map(), so = new Map(), ss = new Map();
+  for (const d of snap.docs){
+    const data = d.data()||{}; const its = data.items||{};
+    let size = 0;
+    for (const [id,t] of Object.entries(its)){ if(!t||!t.ru) continue; next.set(id,{...t,id,_fav0:t.fav,_uses0:t.uses}); so.set(id,d.id); size += (t.ru.length+(t.kz||"").length)*2; }
+    ss.set(d.id,size);
+  }
+  items = next; shardOf = so; shardSize = ss;
+  overlayPrefs(); rebuildIndex(); render();
+}
+async function initDb(){
+  if (!window.claude?.use){ setStatus("err","хранилище недоступно"); dbReady=true; render(); return; }
+  db = await window.claude.use("db");
+  if (!db){ setStatus("err","хранилище недоступно — войдите в claude.ai"); dbReady=true; render(); return; }
+  userApi = await window.claude.use("user");
+  me.canEdit = false; me.isOwner = false; me.canWrite = true;
+  if (userApi){
+    try{
+      me.isOwner = !!(await userApi.isOwner());
+      const cw = await userApi.can("data.write"); me.canWrite = me.isOwner || cw !== false;
+      me.uid = await userApi.id();
+    }catch(e){ console.warn(e); }
+  }
+  const pr = prefsRef();
+  if (pr) pr.onSnapshot(s=>{
+    const d = (s.exists && s.data()) || {}; prefs = {fav:{...(d.fav||{})}, uses:{...(d.uses||{})}}; overlayPrefs(); render();
+    if (d.name && !opName && document.activeElement!==$("#opName")){ opName = String(d.name); ls("sufler.name", opName); $("#opName").value = opName; if (quickMode) renderQuick(); }
+  }, ()=>{});
+  if (LOCAL){ await window.__SUFLER_LOCAL.ready; if (window.__SUFLER_LOCAL.isEmpty()) showImport(); }
+  await startGate();
+  const timer = setTimeout(()=>{ if(!dbReady) setStatus("err","данные пока не загрузились…"); }, 10000);
+  db.collection("shards").onSnapshot(snap=>{
+    if (!snap.metadata.fromCache){ dbReady = true; clearTimeout(timer); setStatus("ok", (LOCAL ? "локально · " : "") + `${items.size} шаблонов`); }
+    applyShards(snap);
+    if (dbReady) setStatus("ok", (LOCAL ? "локально · " : "") + `${items.size} шаблонов`);
+  }, err=>{ clearTimeout(timer); dbReady=true; setStatus("err","ошибка хранилища: "+err.code); render(); });
+}
+
+/* ---------- form ---------- */
+function resetForm(){
+  editingId=null; $("#form").reset(); $("#formTitle").textContent="Новый шаблон";
+  $("#cancelEdit").hidden=true; $("#delBtn").hidden=true; $("#delConfirm").hidden=true; $("#aiNote").textContent="";
+  if (block) $("#f-block").value = block;
+}
+function openEdit(id){
+  const t = items.get(id); if(!t) return;
+  editingId = id; $("#formTitle").textContent="Изменить шаблон";
+  $("#f-title").value=t.title; $("#f-block").value=t.block; $("#f-tags").value=(t.tags||[]).join(", ");
+  $("#f-ru").value=t.ru; $("#f-kz").value=t.kz||"";
+  $("#cancelEdit").hidden=false; $("#delBtn").hidden=false; $("#delConfirm").hidden=true; $("#aiNote").textContent="";
+  setView("add");
+}
+$("#cancelEdit").onclick = ()=>{ resetForm(); setView("search"); };
+$("#delBtn").onclick = ()=>{ $("#delConfirm").hidden=false; $("#delBtn").hidden=true; };
+$("#delConfirm").onclick = ()=>{ if(editingId){ removeTemplate(editingId); toast("Шаблон удалён"); resetForm(); setView("search"); } };
+$("#form").addEventListener("submit", async e=>{
+  e.preventDefault();
+  const old = editingId ? items.get(editingId) : null;
+  const t = {
+    id: editingId || ("m"+Date.now().toString(36)+Math.random().toString(36).slice(2,6)),
+    title: $("#f-title").value.trim(),
+    block: norm($("#f-block").value.trim()) || "разное",
+    tags: $("#f-tags").value.split(",").map(s=>s.trim().toLowerCase()).filter(Boolean),
+    ru: $("#f-ru").value.trim(),
+    kz: $("#f-kz").value.trim(),
+    status: "ok",
+    fav: old?.fav||false, uses: old?.uses||0, date: old?.date||Math.floor(Date.now()/1000), src: old?.src||"manual",
+    updated: Math.floor(Date.now()/1000)
+  };
+  if (!t.title || !t.ru) return;
+  await saveTemplate(t);
+  toast(old?"Изменения сохранены":"Шаблон добавлен");
+  resetForm(); $("#q").value = ""; setView("search");
+});
+
+/* ---------- AI (sample) ---------- */
+const AI_OFF = "ИИ недоступен в этом окне";
+async function ai(){ if (sample===null && window.claude?.use) sample = await window.claude.use("sample"); return sample; }
+function aiErr(e){
+  const c = e?.code;
+  if (c==="cancelled") return "";
+  if (c==="not_granted"||c==="sampling_disabled") return "ИИ не разрешён для этой страницы";
+  if (c==="rate_limited") return "Слишком часто — подождите немного";
+  return "Не получилось, попробуйте ещё раз";
+}
+$("#aiTags").onclick = async ()=>{
+  const s = await ai(); if(!s){ $("#aiNote").textContent=AI_OFF; return; }
+  const text = $("#f-ru").value.trim(); if(!text){ $("#aiNote").textContent="Сначала введите текст RU"; return; }
+  $("#aiNote").textContent="Подбираю ключевые слова…";
+  try{
+    const tags = await s.json(`Ты помогаешь оператору чата поддержки банка искать шаблоны ответов. Придумай 6–10 ключевых слов для поиска этого шаблона: короткие слова и сокращения, которыми оператор будет искать (например «возв», «возврат», «вернуть деньги», «кб», «кешбэк»). Только строчные буквы. Ответь только JSON-массивом строк.\n\nНазвание: ${$("#f-title").value}\nТекст:\n${text.slice(0,3000)}`, {modelTier:"quick"});
+    if (Array.isArray(tags)){ const cur=$("#f-tags").value.split(",").map(x=>x.trim()).filter(Boolean); $("#f-tags").value=[...new Set([...cur,...tags.map(String)])].join(", "); $("#aiNote").textContent="Готово"; }
+  }catch(e){ $("#aiNote").textContent=aiErr(e); }
+};
+$("#aiKz").onclick = async ()=>{
+  const s = await ai(); if(!s){ $("#aiNote").textContent=AI_OFF; return; }
+  const text = $("#f-ru").value.trim(); if(!text){ $("#aiNote").textContent="Сначала введите текст RU"; return; }
+  $("#aiNote").textContent="Перевожу…";
+  try{
+    const {text:out} = await s(`Переведи ответ службы поддержки банка с русского на казахский язык. Вежливое обращение на «Сіз», естественный деловой стиль, как пишут казахстанские банки. Сохрани переносы строк, списки, эмодзи, суммы и названия продуктов (Freedom SuperApp и т.п.). Ответь только переводом.\n\n${text}`, {modelTier:"quick"});
+    $("#f-kz").value = out.trim(); $("#aiNote").textContent="Готово — проверьте перевод";
+  }catch(e){ $("#aiNote").textContent=aiErr(e); }
+};
+
+/* ---------- smart corrector (+ translation) ---------- */
+let fixCtl=null, fixT=null, fixLang = ls("sufler.lang2")||"ru", fixRu = "", outEdited = false;
+const LANG_NAME = {ru:"русском", kz:"казахском (вежливо, на «Сіз»)", en:"английском"};
+function setFixLang(l){
+  fixLang = l; ls("sufler.lang2", l);
+  $$("#fixLang button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.l===l));
+  $("#fixCopyBoth").hidden = l==="ru";
+  $("#fixLabel").textContent = l==="ru" ? "Готовый ответ — можно править" : (l==="kz"?"Готовый ответ на казахском — можно править":"Готовый ответ на английском — можно править");
+}
+setFixLang(fixLang);
+$("#fixLang").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b)return; setFixLang(b.dataset.l); runFix(true); $("#fixIn").focus(); });
+
+function variantCount(t){ const n=t.trim().length; return n<40?3 : n<100?4 : n<200?5 : n<400?6 : 7; }
+function fixPrompt(text){
+  const p = dayPart(), nm = opName.trim();
+  return `Ты — оператор чата поддержки Freedom Bank (Казахстан). Преврати черновик в готовое сообщение клиенту.
+Правила: исправь ошибки и сокращения; грубое или простое перепиши вежливо на «Вы» («что тебе надо» → «Чем могу вам помочь?»); сохрани все факты, ничего не выдумывай; не здоровайся, если в черновике нет приветствия.
+Ситуации (узнавай по обрывкам):
+- «изуч», «гляну», «проверю» → благодарим за обращение, изучаю вопрос, скоро вернусь с ответом;
+- «жди» → пожалуйста, ожидайте, проверка ещё идёт;
+- «наплыв», «сорри долго» → извинись за ожидание, много обращений, мы не забыли о вас;
+- «передал», «создал заявку» → передано профильным специалистам, свяжутся;
+- «тикет», «в работе», «опять пишет» → заявка ещё у специалистов, на контроле, ответ придёт сразу как будет; при повторном вопросе извинись за долгое ожидание; без сроков; каждый раз новыми словами;
+- «вы тут?» → на связи ли клиент и актуален ли вопрос;
+- «пока» → поблагодари и попрощайся.
+Время: ${PART_NAME[p]}. Приветствие только «${GREET[fixLang][p]}» или «Здравствуйте», прощание «${BYE[fixLang][p]}».${nm ? ` Оператора зовут ${nm}; в приветствии представься: «Меня зовут ${nm}».` : ""}
+Язык ответа: ${LANG_NAME[fixLang]}.
+`;
+}
+/* fast path: only the best answer, plain text, streamed */
+function bestPrompt(text){
+  return fixPrompt(text) + `
+Задача: напиши ОДИН лучший вариант сообщения клиенту. Ответь только текстом сообщения, без кавычек и пояснений.
+
+Черновик:
+${text}`;
+}
+const REQUIRED_STYLES = [
+  ["вежливо", "корректно и вежливо, классический стиль поддержки банка"],
+  ["с эмпатией", "для недовольного или жалующегося клиента: признай его чувства, извинись за неудобства, прояви лояльность и заботу, заверь, что поможешь"],
+  ["коротко", "максимально кратко, 1–2 предложения, только суть"],
+  ["простыми словами", "без банковских терминов и канцелярита, так, чтобы понял любой клиент"],
+  ["по-человечески", "тепло и живо, как пишет живой человек, а не робот, но на «Вы»"],
+];
+function variantsPrompt(text){
+  const extra = Math.max(0, variantCount(text) - 5); // 0–2 extra styles for longer drafts
+  const req = REQUIRED_STYLES.map(([s,d],i)=>`${i+1}. «${s}» — ${d}`).join("\n");
+  return fixPrompt(text) + `
+Задача: дай варианты сообщения строго в таком порядке и с такими названиями стилей:
+${req}${extra?`\nЗатем ещё ${extra} вариант(а) в своих стилях на выбор, например «подробнее», «официально», «с извинением» (только если уместно) — названия стилей придумай сам, коротко.`:""}
+Варианты должны заметно отличаться друг от друга. Не растягивай: каждый вариант не длиннее, чем нужно по смыслу, «коротко» — 1–2 предложения.
+
+Формат ответа строго такой: каждая строка — отдельный JSON-объект {"style": "...", "text": "..."}, по одной строке на вариант, без нумерации, без markdown и без другого текста. Переносы строк внутри текста записывай как \\n.${fixLang!=="ru"?' Последней строкой добавь {"ru": "вариант «вежливо» на русском"}.':""}
+
+Черновик:
+${text}`;
+}
+/* quick answers shown while the draft is empty: click or Alt+digit */
+const QUICK = [
+  ["Привет + изучаю", "{привет}! Меня зовут {имя}. Изучаю ваш запрос, скоро предоставлю ответ."],
+  ["Привет", "{привет}! Меня зовут {имя}. Чем могу вам помочь?"],
+  ["Изучаю", "Благодарим за обращение! Изучаю ваш вопрос, в ближайшее время вернусь с ответом."],
+  ["Ожидайте", "Пожалуйста, ожидайте, я ещё проверяю информацию. Благодарим за терпение!"],
+  ["Спасибо за ожидание", "Благодарим за ожидание! "],
+  ["Наплыв", "Приносим извинения за долгое ожидание. Сейчас поступает большое количество обращений, но мы не забыли о вас и ответим в ближайшее время."],
+  ["Уточните", "Уточните, пожалуйста, ваш вопрос подробнее, чтобы мы могли вам помочь."],
+  ["Передано специалистам", "Ваше обращение передано профильным специалистам. Они изучат ситуацию и свяжутся с вами."],
+  ["Тикет в работе", "Ваше обращение находится в работе у профильных специалистов. Как только они завершат проверку, мы сразу сообщим вам результат. Благодарим за терпение!"],
+  ["Тикет: снова спрашивает", "Понимаем, что ожидание затянулось, и приносим извинения. Ваша заявка всё ещё на рассмотрении у специалистов, мы держим её на контроле и сообщим, как только появится ответ."],
+  ["Вы на связи?", "Вы на связи? Если вопрос ещё актуален, напишите, пожалуйста."],
+  ["Прощание", "Рады были помочь! Если появятся вопросы — пишите, мы всегда на связи. {пока}!"],
+];
+let opName = ls("sufler.name") || "";
+function quickText(i){
+  const p = dayPart();
+  const t = QUICK[i][1].replace("{привет}", GREET.ru[p]).replace("{пока}", BYE.ru[p]);
+  return opName.trim() ? t.replace("{имя}", opName.trim()) : t.replace(/ ?Меня зовут \{имя\}\./, "");
+}
+let quickMode = false;
+function renderQuick(){
+  quickMode = true;
+  $("#variants").innerHTML = '<p class="quick-head">Быстрые ответы — клик или Alt+цифра, текст сразу копируется</p>' +
+    QUICK.map((q,i)=>`<div class="variant quick" data-q="${i}"><div class="v-head">${i<9?`<kbd class="vnum">Alt+${i+1}</kbd>`:""}<span class="v-style">${esc(q[0])}</span></div><div class="v-text">${esc(quickText(i))}</div></div>`).join("");
+}
+async function useQuick(i){
+  if (!QUICK[i]) return;
+  const t = quickText(i);
+  if (fixLang !== "ru"){ $("#fixIn").value = t; ls("sufler.fix", t); runFix(); toast("Перевожу…"); return; }
+  $("#fixOut").value = t; outEdited = false; fixRu = t;
+  toast(await copy(t) ? "Скопировано" : "Не удалось скопировать");
+  const card = document.querySelector(`#variants .quick[data-q="${i}"]`);
+  if (card){ card.classList.add("flash"); setTimeout(()=>card.classList.remove("flash"),500); }
+}
+$("#opName").value = opName;
+$("#opName").addEventListener("input", ()=>{
+  opName = $("#opName").value; ls("sufler.name", opName);
+  if (quickMode) renderQuick();
+  clearTimeout(useQuick._t); useQuick._t = setTimeout(()=>writePrefs({name: opName}), 800);
+});
+function renderVariants(list, expect){
+  expect = expect || 0;
+  if (!list.length && !expect){ renderQuick(); return; }
+  quickMode = false;
+  const ph = [];
+  for (let i = list.length; i < expect; i++) ph.push(`<div class="variant ph-card"><div class="v-head">${i<9?`<kbd class="vnum">Alt+${i+1}</kbd>`:""}<span class="v-style">${esc(REQUIRED_STYLES[i]?.[0] || "вариант")}</span><span class="spin"></span></div></div>`);
+  $("#variants").innerHTML = list.map((v,i)=>`<div class="variant" data-i="${i}"><div class="v-head">${i<9?`<kbd class="vnum" title="Alt+${i+1} — скопировать">Alt+${i+1}</kbd>`:""}<span class="v-style">${esc(v.style||"вариант")}</span><span class="spacer"></span><button class="ic" data-va="use" title="Взять в готовый ответ и дописать">✎</button></div><div class="v-text">${esc(v.text)}</div></div>`).join("") + ph.join("");
+  $("#variants")._list = list.slice();
+}
+async function copyVariant(i){
+  if (quickMode) return useQuick(i);
+  const v = $("#variants")._list?.[i]; if(!v) return;
+  toast(await copy(v.text) ? `Вариант ${i+1} скопирован` : "Не удалось скопировать");
+  const card = document.querySelector(`#variants .variant[data-i="${i}"]`);
+  if (card){ card.classList.add("flash"); setTimeout(()=>card.classList.remove("flash"),500); }
+}
+$("#variants").addEventListener("click", async e=>{
+  const qc = e.target.closest(".quick"); if (qc){ useQuick(+qc.dataset.q); return; }
+  const card = e.target.closest(".variant"); if(!card) return;
+  const v = $("#variants")._list?.[+card.dataset.i]; if(!v) return;
+  if (e.target.closest("[data-va=use]")){ $("#fixOut").value = v.text; outEdited=false; $("#fixOut").focus(); return; }
+  toast(await copy(v.text)?"Вариант скопирован":"Не удалось скопировать");
+  card.classList.add("flash"); setTimeout(()=>card.classList.remove("flash"),500);
+});
+
+/* templates related to the draft/answer: any-word match, ranked */
+const STOP = new Set("и в во на с со по к ко у о об от до за из для не ни что как это вы вам вас ваш ваша ваши мы нам нас наш я ты тебе мне он она они а но же ли бы то так уже ещё еще есть был была быть или если при".split(" "));
+function relatedTemplates(text, limit){
+  const toks = [...new Set(words(text))].filter(t=>t.length>=3 && !STOP.has(t)).slice(0,30);
+  if (!toks.length) return [];
+  const res = [];
+  for (const e of index){
+    let s = 0, hit = 0;
+    for (const tok of toks){ const sc = Math.max(tokScore(tok,e.head,3), tokScore(tok,e.body,1)); if (sc){ s+=sc; hit++; } }
+    if (!hit) continue;
+    const t = items.get(e.id); if(!t || t.status==="old") continue;
+    const cover = hit / toks.length;
+    if (toks.length>2 && cover < 0.34) continue;
+    res.push({t, s: s*cover + (t.status==="ok"?1:0) + Math.min(t.uses||0,20)/10 + (DEFAULT_BLOCKS.includes(t.block) && cover>=0.5 ? 3 : 0)});
+  }
+  res.sort((a,b)=>b.s-a.s);
+  return res.slice(0,limit).map(r=>r.t);
+}
+function renderFixTemplates(){
+  const base = $("#fixIn").value + " " + (fixRu || "");
+  const list = relatedTemplates(base, 5);
+  $("#fixTpl")._list = list;
+  $("#fixTpl").innerHTML = list.length ? list.map((t,i)=>`<div class="variant tpl" data-i="${i}"><div class="v-head"><span class="v-style">${esc(t.block)}</span><span class="spacer"></span>${t.kz?'<button class="ic kz" data-ta="kz" title="Скопировать на казахском">KZ</button>':""}<button class="ic" data-ta="use" title="Взять в готовый ответ и дописать">✎</button></div><div class="v-text">${esc(t.ru)}</div></div>`).join("")
+    : '<div class="empty small">Подходящих шаблонов не нашлось.</div>';
+}
+$("#fixTpl").addEventListener("click", async e=>{
+  const card = e.target.closest(".variant"); if(!card) return;
+  const t = $("#fixTpl")._list?.[+card.dataset.i]; if(!t) return;
+  const act = e.target.closest("[data-ta]")?.dataset.ta;
+  if (act==="use"){ $("#fixOut").value = (fixLang==="kz"&&t.kz)?t.kz:t.ru; outEdited=false; $("#fixOut").focus(); return; }
+  doCopy(t, act==="kz" ? "kz" : (fixLang==="kz"?"kz":"ru"));
+  card.classList.add("flash"); setTimeout(()=>card.classList.remove("flash"),500);
+});
+
+async function runFix(force){
+  const text = $("#fixIn").value;
+  if (!text.trim()){ $("#fixOut").value=""; fixRu=""; renderVariants([]); $("#fixTpl").innerHTML='<div class="empty small">Подходящие шаблоны появятся здесь.</div>'; $("#fixState").textContent=""; $("#fixSrc").textContent=""; return; }
+  renderFixTemplates();
+  const s = await ai(); if(!s){ return runLocalFix(text); }
+  fixCtl?.abort(); const ctl = fixCtl = new AbortController();
+  $("#fixState").innerHTML='<span class="spin"></span> думаю…';
+  outEdited = false;
+  $("#variants").innerHTML='<div class="empty small"><span class="spin"></span> подбираю варианты…</div>';
+  // 1) best answer: short plain-text call, streamed straight into the editor
+  const pBest = s(bestPrompt(text), {modelTier:"quick", signal:ctl.signal, onText:({text:t})=>{ if(ctl===fixCtl && !outEdited && !instantShown) $("#fixOut").value = t.trim(); }})
+    .then(({text:t})=>{
+      if (ctl!==fixCtl) return;
+      if (!outEdited) $("#fixOut").value = t.trim();
+      if (fixLang==="ru") fixRu = t.trim();
+      $("#fixState").textContent = "";
+      renderFixTemplates();
+    })
+    .catch(e=>{ if(ctl===fixCtl) $("#fixState").textContent=aiErr(e); });
+  // 2) variants in parallel
+  // 2) variants in parallel, streamed one JSON object per line: each card appears as soon as its line is done
+  const vlist = []; let pending = "";
+  const expect = Math.max(5, variantCount(text));
+  if (fixLang==="ru") $("#fixSrc").textContent = "";
+  renderVariants([], expect);
+  const eatLine = line => {
+    line = line.trim().replace(/^```(json)?|```$/g,"").replace(/,$/,"").trim();
+    if (!line.startsWith("{")) return;
+    let o; try{ o = JSON.parse(line); }catch(_){ return; }
+    if (o.ru && !o.text){ fixRu = String(o.ru).trim(); $("#fixSrc").textContent = fixRu ? "RU: " + (fixRu.length>80? fixRu.slice(0,80)+"…" : fixRu) : ""; return; }
+    if (!o.text) return;
+    vlist.push({style:String(o.style||""), text:String(o.text).trim()});
+    renderVariants(vlist, expect);
+  };
+  const pVar = s(variantsPrompt(text), {modelTier:"quick", signal:ctl.signal, onText:({delta})=>{
+      if (ctl!==fixCtl) return;
+      const lines = (pending + delta).split("\n"); pending = lines.pop();
+      lines.forEach(eatLine);
+    }})
+    .then(()=>{ if (ctl!==fixCtl) return; if (pending.trim()) eatLine(pending); pending=""; renderVariants(vlist, 0); })
+    .catch(e=>{ if(ctl===fixCtl && e?.code!=="cancelled") renderVariants(vlist, 0); });
+  await Promise.allSettled([pBest, pVar]);
+}
+/* instant answer without AI for typical short drafts: shows in 0 s, AI result replaces it when ready */
+let instantShown = false;
+function instantIndex(draft){
+  const d = norm(draft).trim();
+  if (!d || d.length > 45) return -1;
+  const hi = /(^|\s)(прив|здр|здравст|добр(ый|ое|ого)|салем|сәлем)/.test(d);
+  if (/тикет|в работе/.test(d) && d.length <= 35) return /(опять|снова|повтор|еще раз|сорри|извин)/.test(d) ? 9 : 8;
+  if (/передал|создал (тикет|заявк)|переда(ли|но)/.test(d) && d.length <= 30) return 7;
+  if (/наплыв|много обращ|сорри.*долг|извин.*долг|долго/.test(d) && d.length <= 35) return 5;
+  if (/(спс|спасибо|благодар).*(ждал|ожид)/.test(d) && d.length <= 30) return 4;
+  if (/изуч|гляну|посмотрю|провер(ю|яю)/.test(d) && d.length <= 28) return hi ? 0 : 2;
+  if (/(^|\s)(жди|ждите|ожид|подожд)/.test(d) && d.length <= 20) return 3;
+  if (/уточн/.test(d) && d.length <= 20) return 6;
+  if (/на связи|вы тут|вы здесь/.test(d) && d.length <= 20) return 10;
+  if (/(^|\s)(пока|до свид|хорошего)/.test(d) && d.length <= 20) return 11;
+  if (hi && d.length < 25) return 1;
+  return -1;
+}
+function showInstant(){
+  instantShown = false;
+  if (fixLang !== "ru") return;
+  const i = instantIndex($("#fixIn").value);
+  if (i < 0 || !QUICK[i]) return;
+  if (!outEdited){ $("#fixOut").value = quickText(i); fixRu = quickText(i); instantShown = true; }
+}
+$("#fixIn").addEventListener("input", ()=>{ clearTimeout(fixT); ls("sufler.fix",$("#fixIn").value); showInstant(); $("#fixState").textContent = instantShown ? "готово · ИИ уточняет…" : "…"; fixT=setTimeout(runFix, 600); });
+$("#fixOut").addEventListener("input", ()=>{ outEdited = true; });
+$("#fixCopy").onclick = async ()=>{ const t = $("#fixOut").value.trim() || $("#fixIn").value.trim(); if(!t)return; toast(await copy(t)?"Скопировано":"Не удалось скопировать"); };
+$("#fixCopyBoth").onclick = async ()=>{ const t=$("#fixOut").value.trim(); if(!t)return; toast(await copy((fixRu?fixRu+"\n\n":"")+t)?"Скопировано RU + перевод":"Не удалось скопировать"); };
+$("#fixClear").onclick = ()=>{ $("#fixIn").value=""; ls("sufler.fix",""); fixCtl?.abort(); runFix(); $("#fixIn").focus(); };
+
+const DEMO_SEED = {"shards/s00":{"items":{"sit01":{"title":"Здравствуйте! Служба поддержки Freedom Bank, чем могу помочь","block":"приветствие","tags":["привет","здравствуйте","приветствие","старт"],"ru":"Здравствуйте! Вас приветствует служба поддержки Freedom Bank. Чем могу вам помочь?","kz":"","status":"ok","fav":false,"uses":0,"date":1795447800,"src":"std"},"sit02":{"title":"Добрый день! Чем могу помочь","block":"приветствие","tags":["привет","добрый день","приветствие"],"ru":"Добрый день! Чем могу вам помочь?","kz":"","status":"ok","fav":false,"uses":0,"date":1795447800,"src":"std"},"sit03":{"title":"Благодарим за обращение, изучаю ваш вопрос","block":"первый ответ","tags":["изуч","изучаю","первый ответ","в работе","взял","спс за обращение"],"ru":"Благодарим за обращение! Изучаю ваш вопрос, в ближайшее время вернусь с ответом.","kz":"","status":"ok","fav":false,"uses":0,"date":1795447800,"src":"std"},"sit04":{"title":"Запрос принят в обработку, ожидайте ответа","block":"первый ответ","tags":["обработка","в обработке","первый ответ","принят","жди"],"ru":"Здравствуйте! Благодарим за обращение. Ваш запрос принят в обработку, пожалуйста, ожидайте — скоро предоставлю ответ.","kz":"","status":"ok","fav":false,"uses":0,"date":1795447800,"src":"std"},"sit05":{"title":"Уже проверяю информацию, это займёт несколько минут","block":"первый ответ","tags":["проверяю","гляну","первый ответ","минуту"],"ru":"Спасибо за ваш вопрос! Уже проверяю информацию, это займёт несколько минут.","kz":"","status":"ok","fav":false,"uses":0,"date":1795447800,"src":"std"},"sit06":{"title":"Пожалуйста, ожидайте, ещё проверяю","block":"ожидание","tags":["жди","ожидайте","ожидание","подождите","проверяю"],"ru":"Пожалуйста, ожидайте, я ещё проверяю информацию. Благодарим за терпение!","kz":"","status":"ok","fav":false,"uses":0,"date":1795447800,"src":"std"},"sit07":{"title":"Проверка занимает больше времени, оставайтесь на связи","block":"ожидание","tags":["жди","долго","ожидание","на связи"],"ru":"Проверка занимает чуть больше времени, чем обычно. Пожалуйста, оставайтесь на связи — я обязательно вернусь с ответом.","kz":"","status":"ok","fav":false,"uses":0,"date":1795447800,"src":"std"},"sit08":{"title":"Благодарим за ожидание","block":"ожидание","tags":["спс что ждали","благодарим за ожидание","ожидание"],"ru":"Благодарим за ожидание! ","kz":"","status":"ok","fav":false,"uses":0,"date":1795447800,"src":"std"},"sit09":{"title":"Наплыв: извините за долгое ожидание, мы не забыли","block":"наплыв","tags":["наплыв","сорри","долго","извините","много обращений","задержка"],"ru":"Приносим извинения за долгое ожидание ответа. Сейчас поступает большое количество обращений, но мы не забыли о вас — ответим в ближайшее время. Благодарим за терпение!","kz":"","status":"ok","fav":false,"uses":0,"date":1795447800,"src":"std"},"sit10":{"title":"Наплыв: время ответа увеличено, вопрос в очереди","block":"наплыв","tags":["наплыв","очередь","задержка","много обращений"],"ru":"Извините за задержку! Из-за большого потока обращений время ответа сейчас увеличено. Ваш вопрос в очереди, и мы обязательно на него ответим.","kz":"","status":"ok","fav":false,"uses":0,"date":1795447800,"src":"std"},"sit11":{"title":"Наплыв: возвращаюсь к вашему вопросу","block":"наплыв","tags":["наплыв","извините","возвращаюсь","нагрузка"],"ru":"Благодарим за терпение и приносим извинения за ожидание. Нагрузка на чат сейчас высокая, поэтому ответ занял больше времени. Возвращаюсь к вашему вопросу.","kz":"","status":"ok","fav":false,"uses":0,"date":1795447800,"src":"std"},"sit12":{"title":"Уточните, пожалуйста, ваш вопрос подробнее","block":"уточняющие вопросы","tags":["уточни","подробнее","уточнение"],"ru":"Уточните, пожалуйста, ваш вопрос подробнее, чтобы мы могли вам помочь.","kz":"","status":"ok","fav":false,"uses":0,"date":1795447800,"src":"std"},"sit13":{"title":"Уточните дату и сумму операции","block":"уточняющие вопросы","tags":["уточни","дата","сумма","операция"],"ru":"Уточните, пожалуйста, дату и сумму операции.","kz":"","status":"ok","fav":false,"uses":0,"date":1795447800,"src":"std"},"sit14":{"title":"Обращение передано профильным специалистам","block":"передано специалистам","tags":["передал","тикет","заявка","специалисты","3 дня"],"ru":"Ваше обращение передано профильным специалистам. Они изучат ситуацию и свяжутся с вами. Срок рассмотрения — до 3 рабочих дней.","kz":"","status":"ok","fav":false,"uses":0,"date":1795447800,"src":"std"},"sit15":{"title":"Вы на связи? Если вопрос актуален — напишите","block":"клиент молчит","tags":["на связи","молчит","не отвечает","вы тут"],"ru":"Вы на связи? Если вопрос ещё актуален, напишите, пожалуйста, — я помогу.","kz":"","status":"ok","fav":false,"uses":0,"date":1795447800,"src":"std"},"sit16":{"title":"Рады были помочь, хорошего дня","block":"прощание","tags":["пока","прощание","хорошего дня","всё"],"ru":"Рады были помочь! Если появятся вопросы — пишите, мы всегда на связи. Хорошего дня!","kz":"","status":"ok","fav":false,"uses":0,"date":1795447800,"src":"std"},"tik01":{"title":"Тикет в работе: заявка у специалистов","block":"тикет в работе","tags":["тикет","в работе","жди","заявка","специалисты"],"ru":"Ваше обращение находится в работе у профильных специалистов. Как только они завершат проверку, мы сразу сообщим вам результат. Благодарим за терпение!","kz":"","status":"ok","fav":false,"uses":0,"date":1795451400,"src":"std"},"tik02":{"title":"Снова спрашивает: ожидание затянулось, извините","block":"тикет в работе","tags":["тикет","в работе","повторно","сорри","долго","опять"],"ru":"Понимаем, что ожидание затянулось, и приносим извинения. Ваша заявка всё ещё на рассмотрении у специалистов, мы держим её на контроле и сообщим, как только появится ответ.","kz":"","status":"ok","fav":false,"uses":0,"date":1795451400,"src":"std"},"tik03":{"title":"Срок рассмотрения обычно до 3 рабочих дней","block":"тикет в работе","tags":["тикет","срок","3 дня","в работе","когда"],"ru":"Рассмотрение заявки обычно занимает до 3 рабочих дней, в отдельных случаях — дольше. Ваш запрос не потерялся: специалисты работают над ним, и мы обязательно вернёмся с ответом.","kz":"","status":"ok","fav":false,"uses":0,"date":1795451400,"src":"std"},"tik04":{"title":"Ускорить нельзя, но заявка на контроле","block":"тикет в работе","tags":["тикет","ускорить","быстрее","контроль","в работе"],"ru":"К сожалению, ускорить рассмотрение мы не можем — проверку проводят профильные специалисты. Мы отметили, что вы ожидаете ответа, и сообщим результат сразу после завершения проверки.","kz":"","status":"ok","fav":false,"uses":0,"date":1795451400,"src":"std"},"tik05":{"title":"Проверили статус: новых данных пока нет","block":"тикет в работе","tags":["тикет","статус","новостей нет","в работе"],"ru":"Мы проверили статус вашей заявки: она по-прежнему в работе, новых данных от специалистов пока нет. Как только информация появится, мы сразу вам напишем.","kz":"","status":"ok","fav":false,"uses":0,"date":1795451400,"src":"std"},"tik06":{"title":"Повторно писать не обязательно","block":"тикет в работе","tags":["тикет","не пишите","повторно","в работе","жди"],"ru":"Повторно писать не обязательно: ваша заявка уже у специалистов, и ответ придёт в этот чат или уведомлением в приложении. Благодарим за понимание и терпение!","kz":"","status":"ok","fav":false,"uses":0,"date":1795451400,"src":"std"}}}};
+/* ================= LOCAL MODE: base file import/export + corrector without AI ================= */
+function fillT(s){
+  const p = dayPart(), nm = (opName||"").trim();
+  s = s.replace(/\{привет\}/g, GREET.ru[p]).replace(/\{пока\}/g, BYE.ru[p]);
+  return nm ? s.replace(/\{имя\}/g, nm) : s.replace(/ ?Меня зовут \{имя\}[.,]?/g, "").replace(/, \{имя\},/g, ",");
+}
+function showImport(){ $("#importGate").hidden = false; }
+function hideImport(){ $("#importGate").hidden = true; }
+function readBaseFile(file, cb){
+  const r = new FileReader();
+  r.onload = () => {
+    try{
+      const j = JSON.parse(r.result);
+      const data = j && j.app === "sufler" ? j.data : j;
+      if (!data || typeof data !== "object" || !Object.keys(data).some(k=>k.startsWith("shards/"))) throw new Error("bad");
+      window.__SUFLER_LOCAL.replace(data);
+      cb(null, Object.entries(data).filter(([k])=>k.startsWith("shards/")).reduce((n,[,d])=>n + (d && d.items ? Object.values(d.items).filter(Boolean).length : 0), 0));
+    }catch(e){ cb(e); }
+  };
+  r.onerror = () => cb(r.error || new Error("read"));
+  r.readAsText(file);
+}
+if (LOCAL){
+  $("#baseBox").hidden = false; setFixLang("ru");
+  $("#fixLang").hidden = true; $("#fixLang").previousElementSibling.hidden = true;
+  $("#aiTags").hidden = true; $("#aiKz").hidden = true;
+  $("#importFile").addEventListener("change", e=>{
+    const f = e.target.files[0]; if(!f) return;
+    readBaseFile(f, (err, n)=>{ if (err){ $("#importErr").textContent = "Не удалось прочитать файл. Нужен файл базы Суфлёра (.json)."; return; } hideImport(); toast(`Загружено шаблонов: ${n}`); });
+  });
+  $("#importDemo").onclick = ()=>{ window.__SUFLER_LOCAL.replace(DEMO_SEED); hideImport(); toast("Загружены примеры"); };
+  $("#baseFile").addEventListener("change", e=>{
+    const f = e.target.files[0]; if(!f) return;
+    readBaseFile(f, (err, n)=>{ $("#baseNote").textContent = err ? "Не удалось прочитать файл." : `Загружено шаблонов: ${n}. Прежняя база заменена.`; e.target.value = ""; });
+  });
+  $("#baseExport").onclick = ()=>{
+    const blob = new Blob([JSON.stringify({app:"sufler", version:1, exportedAt:new Date().toISOString(), data: window.__SUFLER_LOCAL.dump()})], {type:"application/json"});
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = "sufler-base-" + new Date().toISOString().slice(0,10) + ".json";
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+    $("#baseNote").textContent = "Файл скачан.";
+  };
+}
+
+/* five ready variants per typical situation: вежливо, с эмпатией, коротко, простыми словами, по-человечески */
+const SIT_VARIANTS = [
+  ["{привет}! Меня зовут {имя}. Благодарю за обращение, изучаю ваш вопрос и скоро вернусь с ответом.", "{привет}! Меня зовут {имя}. Понимаю, что вопрос важен для вас, — уже разбираюсь и скоро всё подскажу.", "{привет}! Изучаю ваш вопрос, скоро отвечу.", "{привет}! Меня зовут {имя}. Смотрю ваш вопрос, скоро напишу ответ.", "{привет}! Меня зовут {имя}. С радостью помогу. Уже смотрю ваш вопрос, скоро вернусь!"],
+  ["{привет}! Меня зовут {имя}. Чем могу вам помочь?", "{привет}! Меня зовут {имя}. Расскажите, что случилось, — постараюсь помочь.", "{привет}! Чем могу помочь?", "{привет}! Напишите, пожалуйста, ваш вопрос.", "{привет}! Меня зовут {имя}. С радостью помогу. Что у вас случилось?"],
+  ["Благодарим за обращение! Изучаю ваш вопрос, в ближайшее время вернусь с ответом.", "Понимаю, что вопрос важен для вас. Уже изучаю ситуацию и скоро вернусь с ответом.", "Изучаю ваш вопрос, скоро отвечу.", "Смотрю ваш вопрос. Скоро напишу ответ.", "Спасибо, что написали! Уже разбираюсь, скоро всё подскажу."],
+  ["Пожалуйста, ожидайте, я ещё проверяю информацию. Благодарим за терпение!", "Понимаю, что ждать неприятно. Проверка ещё идёт, я обязательно вернусь с ответом. Спасибо за терпение!", "Пожалуйста, ожидайте, проверяю.", "Ещё проверяю. Подождите, пожалуйста, немного.", "Ещё немного — заканчиваю проверку. Спасибо, что ждёте!"],
+  ["Благодарим за ожидание! ", "Спасибо за терпение и за то, что дождались ответа! ", "Спасибо за ожидание! ", "Спасибо, что подождали! ", "Спасибо, что дождались! "],
+  ["Приносим извинения за долгое ожидание. Сейчас поступает большое количество обращений, но мы не забыли о вас и ответим в ближайшее время.", "Простите, что приходится ждать так долго. Сейчас очень много обращений, но ваш вопрос у нас на виду — скоро ответим.", "Извините за ожидание: много обращений. Скоро ответим.", "Извините, что долго. Сейчас много сообщений, но мы про вас помним и скоро ответим.", "Извините, что заставили ждать — сегодня очень много обращений. Мы про вас не забыли, скоро всё подскажем!"],
+  ["Уточните, пожалуйста, ваш вопрос подробнее, чтобы мы могли вам помочь.", "Хотим разобраться в вашей ситуации как можно точнее. Уточните, пожалуйста, подробности.", "Уточните, пожалуйста, детали вопроса.", "Напишите, пожалуйста, подробнее, что произошло.", "Расскажите чуть подробнее, что случилось, — так я быстрее помогу."],
+  ["Ваше обращение передано профильным специалистам. Они изучат ситуацию и свяжутся с вами.", "Понимаем важность вашего вопроса и уже передали его профильным специалистам. Они внимательно всё изучат и свяжутся с вами.", "Передали обращение специалистам, они свяжутся с вами.", "Мы отправили ваш вопрос специалистам. Они проверят и ответят вам.", "Ваш вопрос уже у специалистов. Они во всём разберутся и обязательно с вами свяжутся."],
+  ["Ваше обращение находится в работе у профильных специалистов. Как только они завершат проверку, мы сразу сообщим вам результат.", "Понимаем, что ждать непросто. Ваша заявка в работе у специалистов, и мы держим её на контроле — сообщим результат сразу, как он появится.", "Заявка в работе у специалистов, ответ сообщим сразу.", "Ваш вопрос ещё проверяют специалисты. Как только будет ответ, мы напишем.", "Ваша заявка всё ещё у специалистов. Как только они закончат, сразу дадим знать!"],
+  ["Понимаем, что ожидание затянулось, и приносим извинения. Ваша заявка всё ещё на рассмотрении у специалистов, мы держим её на контроле.", "Нам очень жаль, что ответ занимает столько времени. Ваша заявка не потерялась: специалисты продолжают работу, и мы сообщим результат сразу, как он будет готов.", "Извините за ожидание, заявка ещё в работе. Ответ сообщим сразу.", "Извините, что так долго. Специалисты ещё проверяют вашу заявку. Повторно писать не нужно — мы сами напишем.", "Простите, что всё ещё ждёте. Заявка у специалистов, мы следим за ней и сразу напишем, как будет ответ."],
+  ["Вы на связи? Если вопрос ещё актуален, напишите, пожалуйста.", "Вы на связи? Хотим убедиться, что ваш вопрос решён. Если нужна помощь — напишите, пожалуйста.", "Вы на связи?", "Вы ещё здесь? Если вопрос остался, напишите.", "Вы ещё с нами? Если вопрос остался — пишите, помогу!"],
+  ["Рады были помочь! Если появятся вопросы — пишите, мы всегда на связи. {пока}!", "Спасибо за обращение и за терпение! Если что-то ещё понадобится, мы всегда рядом. {пока}!", "Рады помочь! {пока}!", "Если будут вопросы — пишите. {пока}!", "Было приятно помочь! Пишите, если что. {пока}!"],
+];
+
+/* word-level rules: Cyrillic-aware boundaries */
+const wre = (p, f) => new RegExp(`(^|[^\\p{L}])(${p})(?=$|[^\\p{L}])`, f || "giu");
+const keepCase = (src, rep) => src[0] && src[0] === src[0].toUpperCase() && src[0] !== src[0].toLowerCase() ? rep[0].toUpperCase() + rep.slice(1) : rep;
+const ABBR = [
+  ["здр|здра|здрав|здравст|здравств|здравствуй|здрасте|здрасьте|здраст|здрасти", "здравствуйте"],
+  ["прив|привет|приветик|салам|сәлем|салем", "здравствуйте"],
+  ["фридом банк|фридомбанк|фридом банка|фридом банке", "Freedom Bank"], ["фридом|фридоме|фридома", "Freedom"], ["суперапп|супер апп|суперап", "Freedom SuperApp"],
+  ["скрин|скрины|скрином", "скриншот"], ["смс|sms", "SMS"], ["иин", "ИИН"], ["чси", "ЧСИ"], ["цон", "ЦОН"], ["енпф", "ЕНПФ"],
+  ["епв", "ЕПВ"], ["бин", "БИН"], ["мфо", "МФО"], ["пдп", "ПДП"], ["чдп", "ЧДП"], ["qr|кьюар", "QR"], ["есим|esim", "eSIM"],
+  ["спс|спасиб|пасиб|сяп", "спасибо"],
+  ["пж|пжл|пжлст|плз|плиз|пожалуйсто|пожалусто", "пожалуйста"],
+  ["щас|щя|счас|ща", "сейчас"],
+  ["ок|окей|оке", "хорошо"], ["норм", "хорошо"],
+  ["ч[её]|чо", "что"], ["чтоб", "чтобы"], ["тк|т\\.к", "так как"],
+  ["инфа|инфу|инфы", "информацию"], ["прил|прила|приле|прилу|прилке|прилку", "приложение"],
+  ["вопр", "вопрос"], ["изуч", "изучаю"], ["поддерж|поодерж|подд", "поддержки"],
+  ["мин", "минуту"], ["сек", "секунду"], ["спец|спецы|спецам|спецами", "специалисты"],
+  ["тикет|тикета", "заявка"], ["оч", "очень"], ["щас гляну|гляну", "посмотрю"],
+];
+const YOU = [
+  ["тебе", "вам"], ["тебя", "вас"], ["ты", "вы"], ["тобой", "вами"], ["твой", "ваш"], ["твоя", "ваша"], ["твое|твоё", "ваше"], ["твои", "ваши"],
+  ["твоего", "вашего"], ["твоей", "вашей"], ["твоих", "ваших"], ["твою", "вашу"],
+  ["жди", "ожидайте"], ["подожди", "подождите"], ["напиши", "напишите"], ["скинь|кинь", "отправьте"], ["отправь", "отправьте"],
+  ["проверь", "проверьте"], ["зайди", "зайдите"], ["открой", "откройте"], ["нажми", "нажмите"], ["обратись", "обратитесь"],
+  ["позвони", "позвоните"], ["сделай", "сделайте"], ["скажи", "скажите"], ["уточни", "уточните"], ["дай", "дайте"],
+  ["пришли", "пришлите"], ["попробуй", "попробуйте"], ["обнови", "обновите"], ["перезагрузи", "перезагрузите"], ["выбери", "выберите"],
+  ["можешь", "можете"], ["хочешь", "хотите"], ["знаешь", "знаете"], ["получишь", "получите"], ["сможешь", "сможете"], ["увидишь", "увидите"],
+];
+const PHRASES = [
+  [/^\s*(ч[её]|что|чо)\s*(тебе|вам)?\s*(надо|нужно)\s*\??\s*$/iu, "Чем могу вам помочь?"],
+  [/^\s*(чем помочь|чем могу помочь)\s*\??\s*$/iu, "Чем могу вам помочь?"],
+  [/^\s*(понял|поняла|ясно|принял|приняла)\s*\.?\s*$/iu, "Поняла вас, спасибо за информацию."],
+];
+const SIMPLE = [
+  [/в связи с тем,? что/giu, "потому что"], [/в настоящее время/giu, "сейчас"], [/денежные средства/giu, "деньги"], [/денежных средств/giu, "денег"],
+  [/посредством/giu, "через"], [/произвести оплату/giu, "оплатить"], [/осуществить/giu, "сделать"], [/осуществляется/giu, "делается"],
+  [/по истечении/giu, "после"], [/в целях/giu, "чтобы"], [/является/giu, "это"], [/данн(ый|ая|ое|ые|ого|ой|ым|ую)/giu, (m,e)=>({"ый":"этот","ая":"эта","ое":"это","ые":"эти","ого":"этого","ой":"этой","ым":"этим","ую":"эту"})[e.toLowerCase()]||m],
+];
+function applyRules(t){
+  for (const [re, rep] of PHRASES) if (re.test(t)) return rep;
+  t = t.replace(/[,.]?\s*(чем)\s+(я\s+)?(могу|можем)\s+(вам\s+)?помочь\s*[.?!]?/giu, (m, a, b, c)=> ". Чем " + c + " вам помочь? ").replace(/^\s*\.\s*/, "");
+  for (const [p, rep] of ABBR) t = t.replace(wre(p), (m, b, w)=> b + keepCase(w, rep));
+  for (const [p, rep] of YOU) t = t.replace(wre(p), (m, b, w)=> b + keepCase(w, rep));
+  t = t.replace(/([^\s.,!?])\s+(ожидайте|подождите)\s*[.!]?\s*$/iu, "$1. Пожалуйста, ожидайте.");
+  return t;
+}
+function tidy(t){
+  t = t.replace(/^\s*здравствуйте\s*[.,!]?\s*/iu, "Здравствуйте! ");
+  t = t.replace(/[ \t]+/g, " ").replace(/ +([,.!?;:])/g, "$1").replace(/([,.!?;:])(?=[\p{L}])/gu, "$1 ").trim();
+  t = t.replace(/(^|[.!?]\s+|\n\s*)(\p{Ll})/gu, (m, a, c)=> a + c.toUpperCase());
+  if (t && !/[.!?…)]$/.test(t)) t += /^(как|что|где|когда|почему|зачем|какой|какая|какие|можно|могу|могли|сколько|чем|вы на связи|подскажите|уточните)/iu.test(t) ? "?" : ".";
+  return t;
+}
+function simplify(t){ for (const [re, rep] of SIMPLE) t = t.replace(re, rep); return t; }
+function splitGreeting(t){ const m = t.match(/^((?:здравствуйте|доброе утро|добрый день|добрый вечер)[!.,]?\s*)/iu); return m ? [m[1].replace(/[!.,]?\s*$/, "! "), t.slice(m[1].length)] : ["", t]; }
+function firstSentence(t){ const [g, rest] = splitGreeting(t); const m = rest.match(/^.*?[.!?…](\s|$)/su); return (g + (m ? m[0] : rest)).trim(); }
+function makeVariants(C){
+  const [g, rest] = splitGreeting(C);
+  const isQ = /\?\s*$/.test(C);
+  const v = [
+    ["вежливо", isQ ? C : `${C} Если у вас остались вопросы, мы готовы помочь.`],
+    ["с эмпатией", `${g}Понимаем, как это важно для вас. ${rest} Мы сделаем всё возможное, чтобы помочь.`],
+    ["коротко", firstSentence(C)],
+    ["простыми словами", simplify(C)],
+    ["по-человечески", `${g}Спасибо, что написали! ${rest}${isQ ? "" : " Обращайтесь, если что-то ещё понадобится!"}`],
+  ];
+  return v.map(([style, text])=>({style, text: tidy(text.replace(/\s+/g, " "))}));
+}
+
+/* spelling: LanguageTool public API, suggestions ranked by how often the word appears in our own templates */
+let vocab = null; var vocabDirty = true;
+function getVocab(){
+  if (vocab && !vocabDirty) return vocab; vocabDirty = false;
+  vocab = new Map();
+  for (const t of items.values()) for (const w of ((t.ru||"") + " " + (t.title||"")).toLowerCase().match(/\p{L}+/gu) || []) vocab.set(w, (vocab.get(w)||0) + 1);
+  return vocab;
+}
+let ltCache = new Map(), ltCtl = null;
+async function spellcheck(text){
+  if (ltCache.has(text)) return ltCache.get(text);
+  ltCtl?.abort(); const ctl = ltCtl = new AbortController();
+  const timer = setTimeout(()=>ctl.abort(), 5000);
+  try{
+    const r = await fetch("https://api.languagetool.org/v2/check", {method:"POST", signal: ctl.signal, headers:{"Content-Type":"application/x-www-form-urlencoded"}, body: new URLSearchParams({text, language:"ru-RU", disabledCategories:"STYLE,REDUNDANCY"})});
+    if (!r.ok) throw new Error("lt " + r.status);
+    const j = await r.json();
+    const V = getVocab();
+    let out = text;
+    const ms = (j.matches||[]).filter(m=>m.replacements && m.replacements.length).sort((a,b)=>b.offset - a.offset);
+    for (const m of ms){
+      const orig = text.substr(m.offset, m.length);
+      if ((V.get(orig.toLowerCase())||0) >= 3) continue; // a word our templates use: keep it (Freedom, eSIM, …)
+      const cands = m.replacements.slice(0, 6).map(x=>x.value);
+      let best = cands[0], bestN = -1;
+      cands.forEach((c, i)=>{ const n = (c.toLowerCase().match(/\p{L}+/gu)||[]).reduce((s,w)=>s + (V.get(w)||0), 0) - i*0.01; if (n > bestN){ bestN = n; best = c; } });
+      out = out.slice(0, m.offset) + best + out.slice(m.offset + m.length);
+    }
+    ltCache.set(text, out);
+    return out;
+  } finally { clearTimeout(timer); }
+}
+
+let localSeq = 0;
+async function runLocalFix(text){
+  const seq = ++localSeq;
+  renderFixTemplates();
+  const sit = instantIndex(text);
+  if (sit >= 0 && SIT_VARIANTS[sit]){
+    const vs = SIT_VARIANTS[sit].map((t, i)=>({style: REQUIRED_STYLES[i][0], text: fillT(t)}));
+    if (!outEdited) $("#fixOut").value = vs[0].text;
+    fixRu = vs[0].text; renderVariants(vs, 0); $("#fixState").textContent = "";
+    return;
+  }
+  // 1) instant: abbreviations, «ты» → «Вы», capitals and punctuation
+  let C = tidy(applyRules(text));
+  if (!outEdited) $("#fixOut").value = C;
+  renderVariants(makeVariants(C), 0);
+  $("#fixState").innerHTML = '<span class="spin"></span> проверяю орфографию…';
+  // 2) spelling and punctuation from LanguageTool
+  try{
+    const fixed = await spellcheck(applyRules(text));
+    if (seq !== localSeq) return;
+    C = tidy(applyRules(fixed));
+    if (!outEdited) $("#fixOut").value = C;
+    fixRu = C; renderVariants(makeVariants(C), 0); renderFixTemplates();
+    $("#fixState").textContent = "";
+  }catch(e){
+    if (seq !== localSeq || e?.name === "AbortError" && ltCtl?.signal?.aborted && seq !== localSeq) return;
+    $("#fixState").textContent = navigator.onLine === false ? "нет интернета — исправлены только сокращения" : "проверка орфографии недоступна, исправлены сокращения";
+  }
+}
+/* ---------- links ---------- */
+const GROUPS = ["Рабочие программы","Для клиентов"];
+let linkSel = 0, linkCurrent = [], editingLink = null;
+function matchLinks(q){
+  const toks = words(q);
+  const arr = [...links.values()];
+  if (!toks.length) return arr;
+  return arr.filter(l=>{
+    const w = [...words(l.code), ...words(l.name), ...words(l.note), ...words(l.url.replace(/https?:\/\//,""))];
+    return toks.every(t=>tokScore(t,w,1)>0);
+  });
+}
+function renderLinks(){
+  const list = matchLinks($("#lq").value);
+  if (!links.size){ $("#linkGroups").innerHTML = `<div class="empty">${dbReady?"Ссылок пока нет. Нажмите «+ Ссылка».":"Загружаю ссылки…"}</div>`; linkCurrent=[]; return; }
+  if (!list.length){ $("#linkGroups").innerHTML = `<div class="empty">Ничего не найдено.</div>`; linkCurrent=[]; return; }
+  const groups = [...new Set([...GROUPS, ...list.map(l=>l.group)])];
+  linkCurrent = groups.flatMap(g=>list.filter(l=>l.group===g));
+  if (linkSel>=linkCurrent.length) linkSel=0;
+  const host = u => { try{ return new URL(u).hostname.replace(/^www\./,""); }catch(_){ return u; } };
+  $("#linkGroups").innerHTML = groups.map(g=>{
+    const ls_ = linkCurrent.filter(l=>l.group===g); if(!ls_.length) return "";
+    return `<div class="lgroup"><h3>${esc(g)}</h3><div class="lrows">${ls_.map(l=>`
+      <a class="lrow${linkCurrent.indexOf(l)===linkSel?" sel":""}" data-id="${l.id}" href="${esc(l.url)}" target="_blank" rel="noopener" title="${esc(l.url)}">
+        <span class="lc">${esc(l.code||"—")}</span>
+        <span class="ln">${esc(l.name)}<small>${esc(l.note ? l.note+" · "+host(l.url) : host(l.url))}</small></span>
+        <span class="lr"><button class="ic" data-la="copy" title="Скопировать адрес">⧉</button><button class="ic" data-la="edit" title="Изменить">✎</button></span>
+      </a>`).join("")}</div></div>`;
+  }).join("");
+}
+$("#lq").addEventListener("input", ()=>{ linkSel=0; renderLinks(); });
+$("#lq").addEventListener("keydown", e=>{
+  if (e.key==="ArrowDown"){ e.preventDefault(); linkSel=Math.min(linkSel+1, linkCurrent.length-1); renderLinks(); }
+  else if (e.key==="ArrowUp"){ e.preventDefault(); linkSel=Math.max(linkSel-1,0); renderLinks(); }
+  else if (e.key==="Enter"){ e.preventDefault(); const l=linkCurrent[linkSel]; if(l) document.querySelector(`.lrow[data-id="${l.id}"]`)?.click(); }
+});
+$("#linkGroups").addEventListener("click", async e=>{
+  const b = e.target.closest("[data-la]"); if(!b) return;
+  e.preventDefault(); e.stopPropagation();
+  const l = links.get(b.closest(".lrow").dataset.id); if(!l) return;
+  if (b.dataset.la==="copy") toast(await copy(l.url)?"Адрес скопирован":"Не удалось скопировать");
+  if (b.dataset.la==="edit") openLinkForm(l);
+});
+function openLinkForm(l){
+  editingLink = l?.id || null;
+  $("#linkForm").hidden = false;
+  $("#l-code").value=l?.code||""; $("#l-name").value=l?.name||""; $("#l-url").value=l?.url||""; $("#l-group").value=l?.group||GROUPS[0]; $("#l-note").value=l?.note||"";
+  $("#linkDel").hidden = !l; $("#linkDelOk").hidden = true;
+  $("#l-code").focus();
+}
+$("#linkAddBtn").onclick = ()=>openLinkForm(null);
+$("#linkCancel").onclick = ()=>{ $("#linkForm").hidden=true; $("#lq").focus(); };
+$("#linkDel").onclick = ()=>{ $("#linkDel").hidden=true; $("#linkDelOk").hidden=false; };
+$("#linkDelOk").onclick = ()=>{
+  if(!editingLink) return; links.delete(editingLink);
+  if (db) enqueue("links", ()=>db.doc("meta/links").update({items:{[editingLink]:null}}));
+  $("#linkForm").hidden=true; renderLinks(); toast("Ссылка удалена");
+};
+$("#linkForm").addEventListener("submit", e=>{
+  e.preventDefault();
+  const l = { id: editingLink || ("l"+Date.now().toString(36)), code:$("#l-code").value.trim().toLowerCase(), name:$("#l-name").value.trim(), url:$("#l-url").value.trim(), group:$("#l-group").value, note:$("#l-note").value.trim() };
+  if (!l.name || !l.url) return;
+  links.set(l.id, l);
+  if (db) enqueue("links", async ()=>{ const ref=db.doc("meta/links"); try{ await ref.update({items:{[l.id]:l}}) }catch(err){ if(err?.code==="invalid_argument") await ref.set({items:{[l.id]:l}}); else throw err; } });
+  $("#linkForm").hidden=true; renderLinks(); toast("Ссылка сохранена"); $("#lq").focus();
+});
+function initLinks(){
+  if (!db) return;
+  db.doc("meta/links").onSnapshot(snap=>{
+    const its = (snap.exists && snap.data().items) || {};
+    links = new Map(Object.entries(its).filter(([,v])=>v&&v.url).map(([id,v])=>[id,{...v,id}]));
+    if (view==="links") renderLinks();
+  }, ()=>{});
+}
+
+/* ---------- boot ---------- */
+$("#fixIn").value = ls("sufler.fix")||"";
+if (!$("#fixIn").value.trim()) renderQuick();
+let lastPart = "";
+function updDayPart(){
+  const p = dayPart(); $("#dayPartNote").textContent = `сейчас ${PART_NAME[p]} · «${GREET.ru[p]}»`;
+  if (p !== lastPart){ lastPart = p; if (quickMode) renderQuick(); }
+}
+updDayPart(); setInterval(updDayPart, 60000);
+render();
+{ const sv = ls("sufler.view"); setView(VIEWS.includes(sv) && sv!=="add" ? sv : (sv==="tr" ? "fix" : "search")); }
+initDb();
+})();
+</script>
+
+</body>
+</html>

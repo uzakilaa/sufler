@@ -1,0 +1,2 @@
+# Template base files contain internal bank data: never commit them
+*.json

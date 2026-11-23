@@ -213,6 +213,26 @@ nav.tabs kbd{border:0;padding:0;opacity:.55}
 aside li button{padding:6px 10px;font-size:14px}
 .meta-line .note kbd{margin:0 1px}
 
+/* entry gate */
+.gate{position:fixed;inset:0;z-index:30;background:var(--bg);display:grid;place-items:center;padding:24px max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px))}
+.gate-box{width:min(560px,100%);display:grid;gap:20px}
+.gate .brand{font-size:24px}
+.gate-q{font:500 18px var(--display);margin:0 0 12px}
+.gate-opts{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.gate-opt{text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:grid;gap:6px}
+.gate-opt:hover,.gate-opt:focus-visible{border-color:var(--sage);background:var(--panel-2)}
+.gate-opt b{font:600 17px var(--body)}
+.gate-opt span{font-size:13px;color:var(--muted)}
+#pwInput{width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-size:18px;outline:none;margin-bottom:6px}
+#pwInput:focus{border-color:var(--sage)}
+.gate-err{min-height:20px;margin:0 0 8px;font-size:13px;color:var(--danger)}
+.base-box{max-width:820px;margin-top:36px;padding-top:24px;border-top:1px solid var(--line);display:grid;gap:10px}
+.base-box h2{font:500 18px var(--display);margin:0}
+label.gate-opt{cursor:pointer}
+.mode-chip{border:1px solid var(--line);background:none;border-radius:999px;padding:4px 12px;font:500 12px var(--mono);color:var(--muted)}
+.mode-chip.ed{border-color:var(--copper);color:var(--copper-hi)}
+@media (max-width:560px){.gate-opts{grid-template-columns:1fr}}
+
 /* read-only viewers: copy and corrector only */
 body.ro [data-act="edit"], body.ro [data-act="ok"], body.ro .review-row, body.ro .kbnote{display:none!important}
 .kbnote{font-size:12px;color:var(--warn)}
@@ -232,6 +252,11 @@ body.ro [data-act="edit"], body.ro [data-act="ok"], body.ro .review-row, body.ro
 /* corrector: quieter extras */
 .variant{border-color:transparent;padding:10px 14px}
 .variant:hover{border-color:transparent;background:var(--panel-2)}
+.variant.ph-card{opacity:.55;cursor:default}
+.name-field{display:inline-flex;align-items:center;gap:8px}
+.name-field input{width:120px;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:5px 10px;outline:none;font-size:13px}
+.name-field input:focus{border-color:var(--sage)}
+.quick-head{font-size:12px;color:var(--muted);margin:0 0 2px}
 .variant .v-head .ic{opacity:0}
 .variant:hover .v-head .ic{opacity:1}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
@@ -247,6 +272,7 @@ body.ro [data-act="edit"], body.ro [data-act="ok"], body.ro .review-row, body.ro
       <button role="tab" data-view="links" title="Alt+R">Ссылки <kbd>Alt+R</kbd></button>
     </nav>
     <div class="status" id="status"><span class="dot"></span><span id="statusText">подключаюсь…</span></div>
+    <button class="mode-chip" id="modeChip" type="button" hidden title="Сменить режим">гость</button>
   </div>
 </header>
 
@@ -307,6 +333,16 @@ body.ro [data-act="edit"], body.ro [data-act="ok"], body.ro .review-row, body.ro
       </div>
       <p class="note"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> — сохранить.</p>
     </form>
+    <div class="base-box" id="baseBox" hidden>
+      <h2>База шаблонов</h2>
+      <p class="note">Шаблоны хранятся в этом браузере. Скачайте файл, чтобы перенести базу на другой компьютер или отдать коллеге, и загрузите его там.</p>
+      <div class="row-actions">
+        <button class="btn primary" type="button" id="baseExport">Скачать базу (.json)</button>
+        <label class="btn" for="baseFile">Загрузить файл базы</label>
+        <input type="file" id="baseFile" accept=".json,application/json" hidden>
+        <span class="note" id="baseNote"></span>
+      </div>
+    </div>
   </section>
 
   <!-- FIX (corrector + translation) -->
@@ -315,6 +351,8 @@ body.ro [data-act="edit"], body.ro [data-act="ok"], body.ro .review-row, body.ro
       <div class="tool-top">
         <h2>Корректор</h2>
         <div class="tool-top-r">
+          <span class="note daypart" id="dayPartNote" title="Приветствия и прощания подстраиваются под время суток"></span>
+          <label class="note name-field" for="opName">Ваше имя <input id="opName" autocomplete="off" placeholder="Илияс" maxlength="30"></label>
           <span class="note">Ответ на языке:</span>
           <div class="seg" id="fixLang"><button data-l="ru" aria-pressed="true">Русский</button><button data-l="kz" aria-pressed="false">Қазақша</button><button data-l="en" aria-pressed="false">English</button></div>
         </div>
@@ -362,18 +400,138 @@ body.ro [data-act="edit"], body.ro [data-act="ok"], body.ro .review-row, body.ro
       <div class="row-actions" style="grid-column:1/-1"><button class="btn primary" type="submit">Сохранить</button><button class="btn" type="button" id="linkCancel">Отмена</button><span class="spacer"></span><button class="btn danger" type="button" id="linkDel" hidden>Удалить</button><button class="btn danger" type="button" id="linkDelOk" hidden>Точно удалить?</button></div>
     </form>
     <div id="linkGroups"></div>
+    <div class="lgroup" id="pwPanel" hidden>
+      <h3>Пароли редакторов — видно только владельцу</h3>
+      <div class="lrows" id="pwRows"></div>
+    </div>
   </section>
 </main>
 <div class="toast" id="toast"></div>
 
+<!-- ENTRY GATE -->
+<div class="gate" id="gate" hidden>
+  <div class="gate-box">
+    <div class="brand"><i></i>Суфлёр</div>
+    <div id="gateChoose">
+      <p class="gate-q">Как войти?</p>
+      <div class="gate-opts">
+        <button class="gate-opt" id="asGuest" type="button"><b>Гость</b><span>Поиск и копирование шаблонов, корректор</span></button>
+        <button class="gate-opt" id="asEditor" type="button"><b>Редактор</b><span>Плюс добавление и правка шаблонов, ссылки</span></button>
+      </div>
+    </div>
+    <form id="gatePw" hidden>
+      <p class="gate-q">Пароль редактора</p>
+      <input id="pwInput" type="password" autocomplete="off" placeholder="Введите пароль" aria-label="Пароль редактора">
+      <p class="gate-err" id="pwErr"></p>
+      <div class="row-actions"><button class="btn primary" type="submit" id="pwGo">Войти</button><button class="btn ghost" type="button" id="pwBack">Назад</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- FIRST RUN (local mode): load a base file or start with examples -->
+<div class="gate" id="importGate" hidden>
+  <div class="gate-box">
+    <div class="brand"><i></i>Суфлёр</div>
+    <p class="gate-q">База шаблонов пока пустая</p>
+    <div class="gate-opts">
+      <label class="gate-opt" for="importFile"><b>Загрузить файл базы</b><span>Файл sufler-base.json, который вам передали</span></label>
+      <button class="gate-opt" id="importDemo" type="button"><b>Начать с примеров</b><span>Около 20 типовых ответов: приветствие, ожидание, наплыв, тикет в работе</span></button>
+    </div>
+    <input type="file" id="importFile" accept=".json,application/json" hidden>
+    <p class="gate-err" id="importErr"></p>
+  </div>
+</div>
+
+<!-- LOCAL MODE: outside claude.ai (e.g. GitHub Pages) the page keeps its data in this browser (IndexedDB) -->
+<script>
+(function(){
+  if (window.claude) return;
+  const DBNAME = "sufler", STORE = "kv";
+  let mem = {};
+  const listeners = new Set();
+  const clone = o => o == null ? o : JSON.parse(JSON.stringify(o));
+  let idbp = null;
+  function openIdb(){ return new Promise((res, rej)=>{ const r = indexedDB.open(DBNAME, 1); r.onupgradeneeded = ()=>r.result.createObjectStore(STORE); r.onsuccess = ()=>res(r.result); r.onerror = ()=>rej(r.error); }); }
+  async function load(){
+    try{ idbp = openIdb(); const d = await idbp; return await new Promise(res=>{ const q = d.transaction(STORE).objectStore(STORE).get("all"); q.onsuccess = ()=>res(q.result || {}); q.onerror = ()=>res({}); }); }
+    catch(e){ try{ return JSON.parse(localStorage.getItem("sufler.all") || "{}"); }catch(_){ return {}; } }
+  }
+  let saveT = null;
+  function save(){ clearTimeout(saveT); saveT = setTimeout(async ()=>{ try{ const d = await idbp; d.transaction(STORE, "readwrite").objectStore(STORE).put(mem, "all"); }catch(e){ try{ localStorage.setItem("sufler.all", JSON.stringify(mem)); }catch(_){} } }, 300); }
+  const ready = load().then(d=>{ mem = d || {}; });
+  function merge(a, b){ for (const k in b){ const v = b[k]; if (v && typeof v === "object" && !Array.isArray(v) && a[k] && typeof a[k] === "object" && !Array.isArray(a[k])) merge(a[k], v); else a[k] = clone(v); } return a; }
+  const meta = {fromCache:false, hasPendingWrites:false};
+  const docSnap = p => ({ id: p.split("/").pop(), exists: p in mem, data: ()=>clone(mem[p]), metadata: meta });
+  function colDocs(c){ const n = c.split("/").length + 1; return Object.keys(mem).filter(p=>p.startsWith(c + "/") && p.split("/").length === n).sort().map(docSnap); }
+  const qsnap = c => { const docs = colDocs(c); return {docs, size:docs.length, empty:!docs.length, metadata:meta, docChanges:()=>[]}; };
+  function notify(){ for (const l of listeners){ try{ l.cb(l.type === "doc" ? docSnap(l.path) : qsnap(l.path)); }catch(e){ console.error(e); } } }
+  function docRef(path){ return {
+    id: path.split("/").pop(), path,
+    async get(){ await ready; return docSnap(path); },
+    async set(d){ await ready; mem[path] = clone(d); save(); notify(); },
+    async update(d){ await ready; if (!(path in mem)) throw {code:"invalid_argument", message:"no such document"}; merge(mem[path], d); save(); notify(); },
+    async delete(){ await ready; delete mem[path]; save(); notify(); },
+    async acquire(){ return {acquired:true}; },
+    onSnapshot(cb){ const l = {type:"doc", path, cb}; listeners.add(l); ready.then(()=>listeners.has(l) && cb(docSnap(path))); return ()=>listeners.delete(l); },
+    collection(p){ return colRef(path + "/" + p); }
+  }; }
+  function colRef(path){ return {
+    path,
+    doc(id){ return docRef(path + "/" + (id || Math.random().toString(36).slice(2))); },
+    async add(d){ const r = this.doc(); await r.set(d); return r; },
+    async get(){ await ready; return qsnap(path); },
+    onSnapshot(cb){ const l = {type:"col", path, cb}; listeners.add(l); ready.then(()=>listeners.has(l) && cb(qsnap(path))); return ()=>listeners.delete(l); },
+    where(){ return this; }, orderBy(){ return this; }, limit(){ return this; }
+  }; }
+  const localDb = { doc: docRef, collection: colRef };
+  const localUser = { isOwner: async()=>true, canEdit: async()=>true, can: async()=>true, id: async()=>"local", profiles: async()=>({}) };
+  window.__SUFLER_LOCAL = {
+    ready,
+    dump: ()=>clone(mem),
+    replace: obj=>{ mem = clone(obj) || {}; save(); notify(); },
+    isEmpty: ()=>!Object.keys(mem).some(p=>p.startsWith("shards/")),
+  };
+  window.claude = { use: async n => n === "db" ? localDb : n === "user" ? localUser : null };
+})();
+</script>
+
 <script>
 (() => {
 "use strict";
+const LOCAL = !!window.__SUFLER_LOCAL;
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 const SHARDS = 24;
-const DEFAULT_BLOCKS = ["приветствие","первый ответ","ожидание","наплыв","уточняющие вопросы","передано специалистам","клиент молчит","прощание"];
+const DEFAULT_BLOCKS = ["приветствие","первый ответ","ожидание","наплыв","уточняющие вопросы","передано специалистам","тикет в работе","клиент молчит","прощание"];
 const VIEWS = ["search","add","fix","links"];
+
+/* ---------- time of day: greetings and farewells that match the clock ---------- */
+const PART_NAME = {morning:"утро", day:"день", evening:"вечер", night:"ночь"};
+const GREET = {
+  ru:{morning:"Доброе утро", day:"Добрый день", evening:"Добрый вечер", night:"Здравствуйте"},
+  kz:{morning:"Қайырлы таң", day:"Қайырлы күн", evening:"Қайырлы кеш", night:"Сәлеметсіз бе"},
+  en:{morning:"Good morning", day:"Good afternoon", evening:"Good evening", night:"Hello"},
+};
+const BYE = {
+  ru:{morning:"Хорошего дня", day:"Хорошего дня", evening:"Хорошего вечера", night:"Доброй ночи"},
+  kz:{morning:"Күніңіз сәтті өтсін", day:"Күніңіз сәтті өтсін", evening:"Кешіңіз сәтті өтсін", night:"Қайырлы түн"},
+  en:{morning:"Have a great day", day:"Have a great day", evening:"Have a nice evening", night:"Have a good night"},
+};
+function dayPart(d){ const h = (d||new Date()).getHours(); return h>=5 && h<12 ? "morning" : h>=12 && h<18 ? "day" : h>=18 && h<23 ? "evening" : "night"; }
+/* swap time-specific greeting at the start and farewell at the end so they match the current time */
+function fitTime(text, lang){
+  if (!text) return text;
+  const p = dayPart();
+  let t = text;
+  if (lang === "kz"){
+    t = t.replace(/^(\s*)Қайырлы (таң|күн|кеш|түн)(?=[!,.\s])/i, (m,sp)=>sp+GREET.kz[p]);
+    t = t.replace(/(Күніңіз|Кешіңіз) сәтті өтсін|Қайырлы түн(?=[!.\s]*$)/g, (m, _a, off)=> off > t.length-90 ? BYE.kz[p] : m);
+    return t;
+  }
+  t = t.replace(/^(\s*)(Доброе утро|Добрый день|Добрый вечер|Доброй ночи)(?=[!,.\s])/i, (m,sp)=>sp+GREET.ru[p]);
+  t = t.replace(/Хорошего (дня|вечера)|Доброй ночи|Спокойной ночи/g, (m, _a, off)=> off > t.length-90 ? BYE.ru[p] : m);
+  return t;
+}
 let links = new Map(); // id -> {code,name,url,group,note}
 
 /* ---------- state ---------- */
@@ -399,6 +557,7 @@ function setStatus(kind,text){const s=$("#status");s.className="status "+(kind||
 /* ---------- search index ---------- */
 let index = []; // {id, w:Set(words of title/tags/block), body:Array words}
 function rebuildIndex(){
+  vocabDirty = true;
   index = [];
   for (const [id,t] of items){
     const head = new Set([...words(t.title), ...(t.tags||[]).flatMap(words), ...words(t.block)]);
@@ -513,7 +672,7 @@ function render(){ renderBlocks(); renderResults(); }
 
 /* ---------- actions ---------- */
 async function doCopy(t, lang){
-  const text = lang==="kz" && t.kz ? t.kz : t.ru;
+  const text = fitTime(lang==="kz" && t.kz ? t.kz : t.ru, lang==="kz" && t.kz ? "kz" : "ru");
   const ok = await copy(text);
   toast(ok ? (lang==="kz"?"Скопировано KZ":"Скопировано") : "Не удалось скопировать — выделите текст вручную");
   const el = document.querySelector(`.card[data-id="${t.id}"]`);
@@ -620,7 +779,93 @@ function applyRole(){
   if (!me.canEdit && (view==="add" || view==="links")) setView("search");
   render();
 }
+/* ---------- entry gate: guest / editor with a personal password ---------- */
+let userApi = null, linksStarted = false;
+const PW_SALT = "sufler-v1:";
+async function pwHash(s){ const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(PW_SALT + s)); return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join(""); }
+function updateModeChip(){
+  const c = $("#modeChip"); c.hidden = false;
+  c.textContent = me.isOwner ? "владелец" : (me.canEdit ? "редактор" : "гость");
+  c.classList.toggle("ed", me.canEdit);
+}
+function setMode(mode, claim){
+  me.canEdit = mode==="editor" || mode==="owner";
+  ls("sufler.mode", mode); if (claim) ls("sufler.claim", claim);
+  $("#gate").hidden = true;
+  updateModeChip(); applyRole();
+  if (me.canEdit && !linksStarted){ linksStarted = true; initLinks(); }
+  if (me.isOwner) initPwPanel();
+  setView(view==="add"||view==="links" ? (me.canEdit?view:"search") : view);
+}
+function showGate(){
+  $("#gate").hidden = false; $("#gateChoose").hidden = false; $("#gatePw").hidden = true; $("#pwErr").textContent = "";
+  requestAnimationFrame(()=>$("#asGuest").focus());
+}
+async function startGate(){
+  if (me.isOwner){ setMode("owner"); return; }
+  if (ls("sufler.mode")==="editor" && ls("sufler.claim") && db && me.uid){
+    try{
+      const s = await db.doc("claims/"+ls("sufler.claim")).get();
+      if (s.exists && s.data().uid === me.uid){ setMode("editor"); return; }
+    }catch(_){}
+  }
+  me.canEdit = false; applyRole(); updateModeChip(); showGate();
+}
+$("#modeChip").onclick = ()=>{ if (!me.isOwner) showGate(); };
+$("#asGuest").onclick = ()=>setMode("guest");
+$("#asEditor").onclick = ()=>{
+  $("#gateChoose").hidden = true; $("#gatePw").hidden = false; $("#pwInput").value = "";
+  $("#pwErr").textContent = me.canWrite ? "" : "У вас доступ только для просмотра. Попросите владельца дать роль «Участник», затем введите пароль.";
+  $("#pwInput").focus();
+};
+$("#pwBack").onclick = ()=>{ $("#gatePw").hidden = true; $("#gateChoose").hidden = false; $("#asEditor").focus(); };
+$("#gatePw").addEventListener("submit", async e=>{
+  e.preventDefault();
+  const pw = $("#pwInput").value.trim(); if (!pw) return;
+  const err = m => { $("#pwErr").textContent = m; $("#pwInput").select(); };
+  if (!db || !me.uid) return err("Нет связи с хранилищем. Войдите в claude.ai и обновите страницу.");
+  $("#pwGo").disabled = true;
+  try{
+    const h = await pwHash(pw);
+    const ref = db.doc("claims/"+h);
+    let s = await ref.get();
+    if (!s.exists) return err("Неверный пароль.");
+    let d = s.data() || {};
+    if (d.uid && d.uid !== me.uid) return err("Этот пароль уже занят другим человеком. Попросите у владельца свой пароль.");
+    if (!d.uid){
+      const lease = await ref.acquire({holder: me.uid, ttlMs: 5000});
+      if (!lease.acquired) return err("Кто-то входит с этим паролем прямо сейчас. Попробуйте через пару секунд.");
+      s = await ref.get(); d = s.data() || {};
+      if (d.uid && d.uid !== me.uid) return err("Этот пароль уже занят другим человеком. Попросите у владельца свой пароль.");
+      await ref.update({uid: me.uid, at: Math.floor(Date.now()/1000)});
+    }
+    setMode("editor", h);
+    toast("Вы вошли как редактор");
+  }catch(ex){ err(ex?.code==="invalid_argument" ? "Нет прав на запись. Попросите владельца дать роль «Участник»." : "Не получилось войти, попробуйте ещё раз."); }
+  finally{ $("#pwGo").disabled = false; }
+});
+
+/* owner-only: who holds which password */
+let pwPanelStarted = false;
+function initPwPanel(){
+  if (pwPanelStarted || !db || LOCAL) return; pwPanelStarted = true;
+  $("#pwPanel").hidden = false;
+  db.collection("claims").onSnapshot(async snap=>{
+    const rows = snap.docs.map(d=>({id:d.id, ...(d.data()||{})})).sort((a,b)=>String(a.label).localeCompare(String(b.label),"ru"));
+    let names = {};
+    const ids = rows.map(r=>r.uid).filter(Boolean);
+    if (ids.length && userApi?.profiles){ try{ names = await userApi.profiles(ids) || {}; }catch(_){} }
+    $("#pwRows").innerHTML = rows.map(r=>`<div class="lrow" data-claim="${esc(r.id)}"><span class="lc">${esc(r.label||"пароль")}</span><span class="ln">${r.uid ? esc(names[r.uid]?.name || "занят") : "свободен"}<small>${r.uid && r.at ? "вошёл "+fmtDate(r.at) : "ещё никто не входил"}</small></span><span class="lr" style="opacity:1">${r.uid?'<button class="btn ghost" data-free="1">Освободить</button>':""}</span></div>`).join("") || '<div class="empty small">Паролей пока нет.</div>';
+  }, ()=>{});
+}
+$("#pwRows").addEventListener("click", async e=>{
+  const b = e.target.closest("[data-free]"); if(!b) return;
+  const id = b.closest("[data-claim]").dataset.claim;
+  try{ await db.doc("claims/"+id).update({uid:null, at:null}); toast("Пароль освобождён"); }catch(_){ toast("Не получилось освободить"); }
+});
+
 async function saveTemplate(t){
+  if (!me.canEdit) return;
   let shard = shardOf.get(t.id);
   const isNew = !shard;
   if (isNew){ shard = pickShard(); shardOf.set(t.id, shard); }
@@ -653,24 +898,27 @@ async function initDb(){
   if (!window.claude?.use){ setStatus("err","хранилище недоступно"); dbReady=true; render(); return; }
   db = await window.claude.use("db");
   if (!db){ setStatus("err","хранилище недоступно — войдите в claude.ai"); dbReady=true; render(); return; }
-  const user = await window.claude.use("user");
-  if (user){
+  userApi = await window.claude.use("user");
+  me.canEdit = false; me.isOwner = false; me.canWrite = true;
+  if (userApi){
     try{
-      me.isOwner = !!(await user.isOwner());
-      const ce = await user.canEdit(); me.canEdit = ce===null || ce===undefined ? true : !!ce;
-      if (me.isOwner) me.canEdit = true;
-      me.uid = await user.id();
+      me.isOwner = !!(await userApi.isOwner());
+      const cw = await userApi.can("data.write"); me.canWrite = me.isOwner || cw !== false;
+      me.uid = await userApi.id();
     }catch(e){ console.warn(e); }
   }
-  applyRole();
   const pr = prefsRef();
-  if (pr) pr.onSnapshot(s=>{ const d = (s.exists && s.data()) || {}; prefs = {fav:{...(d.fav||{})}, uses:{...(d.uses||{})}}; overlayPrefs(); render(); }, ()=>{});
-  if (me.canEdit) initLinks();
+  if (pr) pr.onSnapshot(s=>{
+    const d = (s.exists && s.data()) || {}; prefs = {fav:{...(d.fav||{})}, uses:{...(d.uses||{})}}; overlayPrefs(); render();
+    if (d.name && !opName && document.activeElement!==$("#opName")){ opName = String(d.name); ls("sufler.name", opName); $("#opName").value = opName; if (quickMode) renderQuick(); }
+  }, ()=>{});
+  if (LOCAL){ await window.__SUFLER_LOCAL.ready; if (window.__SUFLER_LOCAL.isEmpty()) showImport(); }
+  await startGate();
   const timer = setTimeout(()=>{ if(!dbReady) setStatus("err","данные пока не загрузились…"); }, 10000);
   db.collection("shards").onSnapshot(snap=>{
-    if (!snap.metadata.fromCache){ dbReady = true; clearTimeout(timer); setStatus("ok", `${items.size} шаблонов`); }
+    if (!snap.metadata.fromCache){ dbReady = true; clearTimeout(timer); setStatus("ok", (LOCAL ? "локально · " : "") + `${items.size} шаблонов`); }
     applyShards(snap);
-    if (dbReady) setStatus("ok", `${items.size} шаблонов`);
+    if (dbReady) setStatus("ok", (LOCAL ? "локально · " : "") + `${items.size} шаблонов`);
   }, err=>{ clearTimeout(timer); dbReady=true; setStatus("err","ошибка хранилища: "+err.code); render(); });
 }
 
@@ -754,27 +1002,19 @@ $("#fixLang").addEventListener("click", e=>{ const b=e.target.closest("button");
 
 function variantCount(t){ const n=t.trim().length; return n<40?3 : n<100?4 : n<200?5 : n<400?6 : 7; }
 function fixPrompt(text){
-  const n = variantCount(text);
-  return `Ты помогаешь оператору чата поддержки Freedom Bank (Казахстан). Оператор пишет черновик быстро, с ошибками и разговорно. Сделай из черновика готовое сообщение клиенту.
-
-Правила:
-- Исправь орфографию, пунктуацию, опечатки, сокращения («здравст» → «Здравствуйте», «щас» → «сейчас»).
-- Грубые, резкие или слишком простые фразы переформулируй в вежливый стиль поддержки банка, обращение на «Вы» (например «что тебе надо» → «Чем могу вам помочь?», «жди» → «Пожалуйста, ожидайте»).
-- Короткое приветствие («привет», «здравствуйте») превращай в полноценное приветствие оператора.
-
-Типовые ситуации оператора. Узнавай их даже по обрывкам слов и сокращениям и дописывай до полной стандартной фразы поддержки:
-- Первый ответ / взял в работу («изуч ваш вопр», «щас гляну», «проверю», «спс за запрос»): поблагодари за обращение, скажи, что изучаешь вопрос и скоро вернёшься с ответом. Пример: «Благодарим за обращение! Изучаю ваш вопрос, в ближайшее время вернусь с ответом.»
-- Ожидание («жди», «подожди», «ещё смотрю»): попроси ожидать, скажи, что проверка ещё идёт, поблагодари за терпение.
-- Наплыв / долгий ответ («наплыв», «сорри что долго», «много обращений»): извинись за долгое ожидание, объясни большим потоком обращений, заверь, что о клиенте не забыли и скоро ответят.
-- Благодарность за ожидание после паузы («спс что ждали»): «Благодарим за ожидание!» и продолжение по смыслу.
-- Передал специалистам / тикет («передал», «создал заявку»): обращение передано профильным специалистам, они рассмотрят и свяжутся.
-- Уточнение («уточни карту», «какая сумма»): вежливый уточняющий вопрос.
-- Клиент молчит («вы тут?», «не отвечает»): спроси, на связи ли клиент и актуален ли вопрос.
-- Прощание («пока», «всё»): поблагодари, предложи обращаться ещё, пожелай хорошего дня.
-Не здоровайся, если черновик — продолжение диалога (ожидание, наплыв, уточнение, ответ по сути). Приветствие ставь только если оно есть в черновике; для первого ответа сделай один из вариантов с приветствием.
-- Сохрани смысл и все факты: суммы, даты, номера, названия. Ничего не выдумывай и не добавляй условий, которых нет в черновике.
-- Сохрани переносы строк и списки, если они есть.
-- Язык ответа: ${LANG_NAME[fixLang]}.
+  const p = dayPart(), nm = opName.trim();
+  return `Ты — оператор чата поддержки Freedom Bank (Казахстан). Преврати черновик в готовое сообщение клиенту.
+Правила: исправь ошибки и сокращения; грубое или простое перепиши вежливо на «Вы» («что тебе надо» → «Чем могу вам помочь?»); сохрани все факты, ничего не выдумывай; не здоровайся, если в черновике нет приветствия.
+Ситуации (узнавай по обрывкам):
+- «изуч», «гляну», «проверю» → благодарим за обращение, изучаю вопрос, скоро вернусь с ответом;
+- «жди» → пожалуйста, ожидайте, проверка ещё идёт;
+- «наплыв», «сорри долго» → извинись за ожидание, много обращений, мы не забыли о вас;
+- «передал», «создал заявку» → передано профильным специалистам, свяжутся;
+- «тикет», «в работе», «опять пишет» → заявка ещё у специалистов, на контроле, ответ придёт сразу как будет; при повторном вопросе извинись за долгое ожидание; без сроков; каждый раз новыми словами;
+- «вы тут?» → на связи ли клиент и актуален ли вопрос;
+- «пока» → поблагодари и попрощайся.
+Время: ${PART_NAME[p]}. Приветствие только «${GREET[fixLang][p]}» или «Здравствуйте», прощание «${BYE[fixLang][p]}».${nm ? ` Оператора зовут ${nm}; в приветствии представься: «Меня зовут ${nm}».` : ""}
+Язык ответа: ${LANG_NAME[fixLang]}.
 `;
 }
 /* fast path: only the best answer, plain text, streamed */
@@ -785,29 +1025,86 @@ function bestPrompt(text){
 Черновик:
 ${text}`;
 }
+const REQUIRED_STYLES = [
+  ["вежливо", "корректно и вежливо, классический стиль поддержки банка"],
+  ["с эмпатией", "для недовольного или жалующегося клиента: признай его чувства, извинись за неудобства, прояви лояльность и заботу, заверь, что поможешь"],
+  ["коротко", "максимально кратко, 1–2 предложения, только суть"],
+  ["простыми словами", "без банковских терминов и канцелярита, так, чтобы понял любой клиент"],
+  ["по-человечески", "тепло и живо, как пишет живой человек, а не робот, но на «Вы»"],
+];
 function variantsPrompt(text){
-  const n = variantCount(text);
+  const extra = Math.max(0, variantCount(text) - 5); // 0–2 extra styles for longer drafts
+  const req = REQUIRED_STYLES.map(([s,d],i)=>`${i+1}. «${s}» — ${d}`).join("\n");
   return fixPrompt(text) + `
-Задача: дай ровно ${n} вариантов сообщения в разных стилях. Стили выбирай из: «вежливо», «по-человечески» (тепло, живо), «коротко», «подробнее», «официально», «с извинением» (только если уместно), «с эмпатией». Варианты должны заметно отличаться друг от друга.${fixLang!=="ru"?' Также верни "ru" — самый нейтральный вариант на русском.':""}
+Задача: дай варианты сообщения строго в таком порядке и с такими названиями стилей:
+${req}${extra?`\nЗатем ещё ${extra} вариант(а) в своих стилях на выбор, например «подробнее», «официально», «с извинением» (только если уместно) — названия стилей придумай сам, коротко.`:""}
+Варианты должны заметно отличаться друг от друга. Не растягивай: каждый вариант не длиннее, чем нужно по смыслу, «коротко» — 1–2 предложения.
 
-Ответь только JSON:
-{${fixLang!=="ru"?'"ru": "вариант на русском", ':""}"variants": [{"style": "коротко", "text": "..."}]}
+Формат ответа строго такой: каждая строка — отдельный JSON-объект {"style": "...", "text": "..."}, по одной строке на вариант, без нумерации, без markdown и без другого текста. Переносы строк внутри текста записывай как \\n.${fixLang!=="ru"?' Последней строкой добавь {"ru": "вариант «вежливо» на русском"}.':""}
 
 Черновик:
 ${text}`;
 }
-function renderVariants(list){
-  if (!list.length){ $("#variants").innerHTML='<div class="empty small">Варианты появятся, когда начнёте писать.</div>'; return; }
-  $("#variants").innerHTML = list.map((v,i)=>`<div class="variant" data-i="${i}"><div class="v-head">${i<9?`<kbd class="vnum" title="Alt+${i+1} — скопировать">Alt+${i+1}</kbd>`:""}<span class="v-style">${esc(v.style||"вариант")}</span><span class="spacer"></span><button class="ic" data-va="use" title="Взять в готовый ответ и дописать">✎</button></div><div class="v-text">${esc(v.text)}</div></div>`).join("");
-  $("#variants")._list = list;
+/* quick answers shown while the draft is empty: click or Alt+digit */
+const QUICK = [
+  ["Привет + изучаю", "{привет}! Меня зовут {имя}. Изучаю ваш запрос, скоро предоставлю ответ."],
+  ["Привет", "{привет}! Меня зовут {имя}. Чем могу вам помочь?"],
+  ["Изучаю", "Благодарим за обращение! Изучаю ваш вопрос, в ближайшее время вернусь с ответом."],
+  ["Ожидайте", "Пожалуйста, ожидайте, я ещё проверяю информацию. Благодарим за терпение!"],
+  ["Спасибо за ожидание", "Благодарим за ожидание! "],
+  ["Наплыв", "Приносим извинения за долгое ожидание. Сейчас поступает большое количество обращений, но мы не забыли о вас и ответим в ближайшее время."],
+  ["Уточните", "Уточните, пожалуйста, ваш вопрос подробнее, чтобы мы могли вам помочь."],
+  ["Передано специалистам", "Ваше обращение передано профильным специалистам. Они изучат ситуацию и свяжутся с вами."],
+  ["Тикет в работе", "Ваше обращение находится в работе у профильных специалистов. Как только они завершат проверку, мы сразу сообщим вам результат. Благодарим за терпение!"],
+  ["Тикет: снова спрашивает", "Понимаем, что ожидание затянулось, и приносим извинения. Ваша заявка всё ещё на рассмотрении у специалистов, мы держим её на контроле и сообщим, как только появится ответ."],
+  ["Вы на связи?", "Вы на связи? Если вопрос ещё актуален, напишите, пожалуйста."],
+  ["Прощание", "Рады были помочь! Если появятся вопросы — пишите, мы всегда на связи. {пока}!"],
+];
+let opName = ls("sufler.name") || "";
+function quickText(i){
+  const p = dayPart();
+  const t = QUICK[i][1].replace("{привет}", GREET.ru[p]).replace("{пока}", BYE.ru[p]);
+  return opName.trim() ? t.replace("{имя}", opName.trim()) : t.replace(/ ?Меня зовут \{имя\}\./, "");
+}
+let quickMode = false;
+function renderQuick(){
+  quickMode = true;
+  $("#variants").innerHTML = '<p class="quick-head">Быстрые ответы — клик или Alt+цифра, текст сразу копируется</p>' +
+    QUICK.map((q,i)=>`<div class="variant quick" data-q="${i}"><div class="v-head">${i<9?`<kbd class="vnum">Alt+${i+1}</kbd>`:""}<span class="v-style">${esc(q[0])}</span></div><div class="v-text">${esc(quickText(i))}</div></div>`).join("");
+}
+async function useQuick(i){
+  if (!QUICK[i]) return;
+  const t = quickText(i);
+  if (fixLang !== "ru"){ $("#fixIn").value = t; ls("sufler.fix", t); runFix(); toast("Перевожу…"); return; }
+  $("#fixOut").value = t; outEdited = false; fixRu = t;
+  toast(await copy(t) ? "Скопировано" : "Не удалось скопировать");
+  const card = document.querySelector(`#variants .quick[data-q="${i}"]`);
+  if (card){ card.classList.add("flash"); setTimeout(()=>card.classList.remove("flash"),500); }
+}
+$("#opName").value = opName;
+$("#opName").addEventListener("input", ()=>{
+  opName = $("#opName").value; ls("sufler.name", opName);
+  if (quickMode) renderQuick();
+  clearTimeout(useQuick._t); useQuick._t = setTimeout(()=>writePrefs({name: opName}), 800);
+});
+function renderVariants(list, expect){
+  expect = expect || 0;
+  if (!list.length && !expect){ renderQuick(); return; }
+  quickMode = false;
+  const ph = [];
+  for (let i = list.length; i < expect; i++) ph.push(`<div class="variant ph-card"><div class="v-head">${i<9?`<kbd class="vnum">Alt+${i+1}</kbd>`:""}<span class="v-style">${esc(REQUIRED_STYLES[i]?.[0] || "вариант")}</span><span class="spin"></span></div></div>`);
+  $("#variants").innerHTML = list.map((v,i)=>`<div class="variant" data-i="${i}"><div class="v-head">${i<9?`<kbd class="vnum" title="Alt+${i+1} — скопировать">Alt+${i+1}</kbd>`:""}<span class="v-style">${esc(v.style||"вариант")}</span><span class="spacer"></span><button class="ic" data-va="use" title="Взять в готовый ответ и дописать">✎</button></div><div class="v-text">${esc(v.text)}</div></div>`).join("") + ph.join("");
+  $("#variants")._list = list.slice();
 }
 async function copyVariant(i){
+  if (quickMode) return useQuick(i);
   const v = $("#variants")._list?.[i]; if(!v) return;
   toast(await copy(v.text) ? `Вариант ${i+1} скопирован` : "Не удалось скопировать");
   const card = document.querySelector(`#variants .variant[data-i="${i}"]`);
   if (card){ card.classList.add("flash"); setTimeout(()=>card.classList.remove("flash"),500); }
 }
 $("#variants").addEventListener("click", async e=>{
+  const qc = e.target.closest(".quick"); if (qc){ useQuick(+qc.dataset.q); return; }
   const card = e.target.closest(".variant"); if(!card) return;
   const v = $("#variants")._list?.[+card.dataset.i]; if(!v) return;
   if (e.target.closest("[data-va=use]")){ $("#fixOut").value = v.text; outEdited=false; $("#fixOut").focus(); return; }
@@ -853,13 +1150,13 @@ async function runFix(force){
   const text = $("#fixIn").value;
   if (!text.trim()){ $("#fixOut").value=""; fixRu=""; renderVariants([]); $("#fixTpl").innerHTML='<div class="empty small">Подходящие шаблоны появятся здесь.</div>'; $("#fixState").textContent=""; $("#fixSrc").textContent=""; return; }
   renderFixTemplates();
-  const s = await ai(); if(!s){ $("#fixState").textContent=AI_OFF; return; }
+  const s = await ai(); if(!s){ return runLocalFix(text); }
   fixCtl?.abort(); const ctl = fixCtl = new AbortController();
   $("#fixState").innerHTML='<span class="spin"></span> думаю…';
   outEdited = false;
   $("#variants").innerHTML='<div class="empty small"><span class="spin"></span> подбираю варианты…</div>';
   // 1) best answer: short plain-text call, streamed straight into the editor
-  const pBest = s(bestPrompt(text), {modelTier:"quick", signal:ctl.signal, onText:({text:t})=>{ if(ctl===fixCtl && !outEdited) $("#fixOut").value = t.trim(); }})
+  const pBest = s(bestPrompt(text), {modelTier:"quick", signal:ctl.signal, onText:({text:t})=>{ if(ctl===fixCtl && !outEdited && !instantShown) $("#fixOut").value = t.trim(); }})
     .then(({text:t})=>{
       if (ctl!==fixCtl) return;
       if (!outEdited) $("#fixOut").value = t.trim();
@@ -869,22 +1166,252 @@ async function runFix(force){
     })
     .catch(e=>{ if(ctl===fixCtl) $("#fixState").textContent=aiErr(e); });
   // 2) variants in parallel
-  const pVar = s.json(variantsPrompt(text), {modelTier:"quick", signal:ctl.signal})
-    .then(r=>{
+  // 2) variants in parallel, streamed one JSON object per line: each card appears as soon as its line is done
+  const vlist = []; let pending = "";
+  const expect = Math.max(5, variantCount(text));
+  if (fixLang==="ru") $("#fixSrc").textContent = "";
+  renderVariants([], expect);
+  const eatLine = line => {
+    line = line.trim().replace(/^```(json)?|```$/g,"").replace(/,$/,"").trim();
+    if (!line.startsWith("{")) return;
+    let o; try{ o = JSON.parse(line); }catch(_){ return; }
+    if (o.ru && !o.text){ fixRu = String(o.ru).trim(); $("#fixSrc").textContent = fixRu ? "RU: " + (fixRu.length>80? fixRu.slice(0,80)+"…" : fixRu) : ""; return; }
+    if (!o.text) return;
+    vlist.push({style:String(o.style||""), text:String(o.text).trim()});
+    renderVariants(vlist, expect);
+  };
+  const pVar = s(variantsPrompt(text), {modelTier:"quick", signal:ctl.signal, onText:({delta})=>{
       if (ctl!==fixCtl) return;
-      if (fixLang!=="ru"){ fixRu = String(r?.ru||"").trim(); $("#fixSrc").textContent = fixRu ? "RU: " + (fixRu.length>80? fixRu.slice(0,80)+"…" : fixRu) : ""; }
-      else $("#fixSrc").textContent = "";
-      renderVariants(Array.isArray(r?.variants) ? r.variants.filter(v=>v&&v.text).map(v=>({style:String(v.style||""), text:String(v.text).trim()})) : []);
-    })
-    .catch(e=>{ if(ctl===fixCtl && e?.code!=="cancelled") renderVariants([]); });
+      const lines = (pending + delta).split("\n"); pending = lines.pop();
+      lines.forEach(eatLine);
+    }})
+    .then(()=>{ if (ctl!==fixCtl) return; if (pending.trim()) eatLine(pending); pending=""; renderVariants(vlist, 0); })
+    .catch(e=>{ if(ctl===fixCtl && e?.code!=="cancelled") renderVariants(vlist, 0); });
   await Promise.allSettled([pBest, pVar]);
 }
-$("#fixIn").addEventListener("input", ()=>{ clearTimeout(fixT); ls("sufler.fix",$("#fixIn").value); $("#fixState").textContent="…"; fixT=setTimeout(runFix, 600); });
+/* instant answer without AI for typical short drafts: shows in 0 s, AI result replaces it when ready */
+let instantShown = false;
+function instantIndex(draft){
+  const d = norm(draft).trim();
+  if (!d || d.length > 45) return -1;
+  const hi = /(^|\s)(прив|здр|здравст|добр(ый|ое|ого)|салем|сәлем)/.test(d);
+  if (/тикет|в работе/.test(d) && d.length <= 35) return /(опять|снова|повтор|еще раз|сорри|извин)/.test(d) ? 9 : 8;
+  if (/передал|создал (тикет|заявк)|переда(ли|но)/.test(d) && d.length <= 30) return 7;
+  if (/наплыв|много обращ|сорри.*долг|извин.*долг|долго/.test(d) && d.length <= 35) return 5;
+  if (/(спс|спасибо|благодар).*(ждал|ожид)/.test(d) && d.length <= 30) return 4;
+  if (/изуч|гляну|посмотрю|провер(ю|яю)/.test(d) && d.length <= 28) return hi ? 0 : 2;
+  if (/(^|\s)(жди|ждите|ожид|подожд)/.test(d) && d.length <= 20) return 3;
+  if (/уточн/.test(d) && d.length <= 20) return 6;
+  if (/на связи|вы тут|вы здесь/.test(d) && d.length <= 20) return 10;
+  if (/(^|\s)(пока|до свид|хорошего)/.test(d) && d.length <= 20) return 11;
+  if (hi && d.length < 25) return 1;
+  return -1;
+}
+function showInstant(){
+  instantShown = false;
+  if (fixLang !== "ru") return;
+  const i = instantIndex($("#fixIn").value);
+  if (i < 0 || !QUICK[i]) return;
+  if (!outEdited){ $("#fixOut").value = quickText(i); fixRu = quickText(i); instantShown = true; }
+}
+$("#fixIn").addEventListener("input", ()=>{ clearTimeout(fixT); ls("sufler.fix",$("#fixIn").value); showInstant(); $("#fixState").textContent = instantShown ? "готово · ИИ уточняет…" : "…"; fixT=setTimeout(runFix, 600); });
 $("#fixOut").addEventListener("input", ()=>{ outEdited = true; });
 $("#fixCopy").onclick = async ()=>{ const t = $("#fixOut").value.trim() || $("#fixIn").value.trim(); if(!t)return; toast(await copy(t)?"Скопировано":"Не удалось скопировать"); };
 $("#fixCopyBoth").onclick = async ()=>{ const t=$("#fixOut").value.trim(); if(!t)return; toast(await copy((fixRu?fixRu+"\n\n":"")+t)?"Скопировано RU + перевод":"Не удалось скопировать"); };
 $("#fixClear").onclick = ()=>{ $("#fixIn").value=""; ls("sufler.fix",""); fixCtl?.abort(); runFix(); $("#fixIn").focus(); };
 
+const DEMO_SEED = {"shards/s00":{"items":{"sit01":{"title":"Здравствуйте! Служба поддержки Freedom Bank, чем могу помочь","block":"приветствие","tags":["привет","здравствуйте","приветствие","старт"],"ru":"Здравствуйте! Вас приветствует служба поддержки Freedom Bank. Чем могу вам помочь?","kz":"","status":"ok","fav":false,"uses":0,"date":1795447800,"src":"std"},"sit02":{"title":"Добрый день! Чем могу помочь","block":"приветствие","tags":["привет","добрый день","приветствие"],"ru":"Добрый день! Чем могу вам помочь?","kz":"","status":"ok","fav":false,"uses":0,"date":1795447800,"src":"std"},"sit03":{"title":"Благодарим за обращение, изучаю ваш вопрос","block":"первый ответ","tags":["изуч","изучаю","первый ответ","в работе","взял","спс за обращение"],"ru":"Благодарим за обращение! Изучаю ваш вопрос, в ближайшее время вернусь с ответом.","kz":"","status":"ok","fav":false,"uses":0,"date":1795447800,"src":"std"},"sit04":{"title":"Запрос принят в обработку, ожидайте ответа","block":"первый ответ","tags":["обработка","в обработке","первый ответ","принят","жди"],"ru":"Здравствуйте! Благодарим за обращение. Ваш запрос принят в обработку, пожалуйста, ожидайте — скоро предоставлю ответ.","kz":"","status":"ok","fav":false,"uses":0,"date":1795447800,"src":"std"},"sit05":{"title":"Уже проверяю информацию, это займёт несколько минут","block":"первый ответ","tags":["проверяю","гляну","первый ответ","минуту"],"ru":"Спасибо за ваш вопрос! Уже проверяю информацию, это займёт несколько минут.","kz":"","status":"ok","fav":false,"uses":0,"date":1795447800,"src":"std"},"sit06":{"title":"Пожалуйста, ожидайте, ещё проверяю","block":"ожидание","tags":["жди","ожидайте","ожидание","подождите","проверяю"],"ru":"Пожалуйста, ожидайте, я ещё проверяю информацию. Благодарим за терпение!","kz":"","status":"ok","fav":false,"uses":0,"date":1795447800,"src":"std"},"sit07":{"title":"Проверка занимает больше времени, оставайтесь на связи","block":"ожидание","tags":["жди","долго","ожидание","на связи"],"ru":"Проверка занимает чуть больше времени, чем обычно. Пожалуйста, оставайтесь на связи — я обязательно вернусь с ответом.","kz":"","status":"ok","fav":false,"uses":0,"date":1795447800,"src":"std"},"sit08":{"title":"Благодарим за ожидание","block":"ожидание","tags":["спс что ждали","благодарим за ожидание","ожидание"],"ru":"Благодарим за ожидание! ","kz":"","status":"ok","fav":false,"uses":0,"date":1795447800,"src":"std"},"sit09":{"title":"Наплыв: извините за долгое ожидание, мы не забыли","block":"наплыв","tags":["наплыв","сорри","долго","извините","много обращений","задержка"],"ru":"Приносим извинения за долгое ожидание ответа. Сейчас поступает большое количество обращений, но мы не забыли о вас — ответим в ближайшее время. Благодарим за терпение!","kz":"","status":"ok","fav":false,"uses":0,"date":1795447800,"src":"std"},"sit10":{"title":"Наплыв: время ответа увеличено, вопрос в очереди","block":"наплыв","tags":["наплыв","очередь","задержка","много обращений"],"ru":"Извините за задержку! Из-за большого потока обращений время ответа сейчас увеличено. Ваш вопрос в очереди, и мы обязательно на него ответим.","kz":"","status":"ok","fav":false,"uses":0,"date":1795447800,"src":"std"},"sit11":{"title":"Наплыв: возвращаюсь к вашему вопросу","block":"наплыв","tags":["наплыв","извините","возвращаюсь","нагрузка"],"ru":"Благодарим за терпение и приносим извинения за ожидание. Нагрузка на чат сейчас высокая, поэтому ответ занял больше времени. Возвращаюсь к вашему вопросу.","kz":"","status":"ok","fav":false,"uses":0,"date":1795447800,"src":"std"},"sit12":{"title":"Уточните, пожалуйста, ваш вопрос подробнее","block":"уточняющие вопросы","tags":["уточни","подробнее","уточнение"],"ru":"Уточните, пожалуйста, ваш вопрос подробнее, чтобы мы могли вам помочь.","kz":"","status":"ok","fav":false,"uses":0,"date":1795447800,"src":"std"},"sit13":{"title":"Уточните дату и сумму операции","block":"уточняющие вопросы","tags":["уточни","дата","сумма","операция"],"ru":"Уточните, пожалуйста, дату и сумму операции.","kz":"","status":"ok","fav":false,"uses":0,"date":1795447800,"src":"std"},"sit14":{"title":"Обращение передано профильным специалистам","block":"передано специалистам","tags":["передал","тикет","заявка","специалисты","3 дня"],"ru":"Ваше обращение передано профильным специалистам. Они изучат ситуацию и свяжутся с вами. Срок рассмотрения — до 3 рабочих дней.","kz":"","status":"ok","fav":false,"uses":0,"date":1795447800,"src":"std"},"sit15":{"title":"Вы на связи? Если вопрос актуален — напишите","block":"клиент молчит","tags":["на связи","молчит","не отвечает","вы тут"],"ru":"Вы на связи? Если вопрос ещё актуален, напишите, пожалуйста, — я помогу.","kz":"","status":"ok","fav":false,"uses":0,"date":1795447800,"src":"std"},"sit16":{"title":"Рады были помочь, хорошего дня","block":"прощание","tags":["пока","прощание","хорошего дня","всё"],"ru":"Рады были помочь! Если появятся вопросы — пишите, мы всегда на связи. Хорошего дня!","kz":"","status":"ok","fav":false,"uses":0,"date":1795447800,"src":"std"},"tik01":{"title":"Тикет в работе: заявка у специалистов","block":"тикет в работе","tags":["тикет","в работе","жди","заявка","специалисты"],"ru":"Ваше обращение находится в работе у профильных специалистов. Как только они завершат проверку, мы сразу сообщим вам результат. Благодарим за терпение!","kz":"","status":"ok","fav":false,"uses":0,"date":1795451400,"src":"std"},"tik02":{"title":"Снова спрашивает: ожидание затянулось, извините","block":"тикет в работе","tags":["тикет","в работе","повторно","сорри","долго","опять"],"ru":"Понимаем, что ожидание затянулось, и приносим извинения. Ваша заявка всё ещё на рассмотрении у специалистов, мы держим её на контроле и сообщим, как только появится ответ.","kz":"","status":"ok","fav":false,"uses":0,"date":1795451400,"src":"std"},"tik03":{"title":"Срок рассмотрения обычно до 3 рабочих дней","block":"тикет в работе","tags":["тикет","срок","3 дня","в работе","когда"],"ru":"Рассмотрение заявки обычно занимает до 3 рабочих дней, в отдельных случаях — дольше. Ваш запрос не потерялся: специалисты работают над ним, и мы обязательно вернёмся с ответом.","kz":"","status":"ok","fav":false,"uses":0,"date":1795451400,"src":"std"},"tik04":{"title":"Ускорить нельзя, но заявка на контроле","block":"тикет в работе","tags":["тикет","ускорить","быстрее","контроль","в работе"],"ru":"К сожалению, ускорить рассмотрение мы не можем — проверку проводят профильные специалисты. Мы отметили, что вы ожидаете ответа, и сообщим результат сразу после завершения проверки.","kz":"","status":"ok","fav":false,"uses":0,"date":1795451400,"src":"std"},"tik05":{"title":"Проверили статус: новых данных пока нет","block":"тикет в работе","tags":["тикет","статус","новостей нет","в работе"],"ru":"Мы проверили статус вашей заявки: она по-прежнему в работе, новых данных от специалистов пока нет. Как только информация появится, мы сразу вам напишем.","kz":"","status":"ok","fav":false,"uses":0,"date":1795451400,"src":"std"},"tik06":{"title":"Повторно писать не обязательно","block":"тикет в работе","tags":["тикет","не пишите","повторно","в работе","жди"],"ru":"Повторно писать не обязательно: ваша заявка уже у специалистов, и ответ придёт в этот чат или уведомлением в приложении. Благодарим за понимание и терпение!","kz":"","status":"ok","fav":false,"uses":0,"date":1795451400,"src":"std"}}}};
+/* ================= LOCAL MODE: base file import/export + corrector without AI ================= */
+function fillT(s){
+  const p = dayPart(), nm = (opName||"").trim();
+  s = s.replace(/\{привет\}/g, GREET.ru[p]).replace(/\{пока\}/g, BYE.ru[p]);
+  return nm ? s.replace(/\{имя\}/g, nm) : s.replace(/ ?Меня зовут \{имя\}[.,]?/g, "").replace(/, \{имя\},/g, ",");
+}
+function showImport(){ $("#importGate").hidden = false; }
+function hideImport(){ $("#importGate").hidden = true; }
+function readBaseFile(file, cb){
+  const r = new FileReader();
+  r.onload = () => {
+    try{
+      const j = JSON.parse(r.result);
+      const data = j && j.app === "sufler" ? j.data : j;
+      if (!data || typeof data !== "object" || !Object.keys(data).some(k=>k.startsWith("shards/"))) throw new Error("bad");
+      window.__SUFLER_LOCAL.replace(data);
+      cb(null, Object.entries(data).filter(([k])=>k.startsWith("shards/")).reduce((n,[,d])=>n + (d && d.items ? Object.values(d.items).filter(Boolean).length : 0), 0));
+    }catch(e){ cb(e); }
+  };
+  r.onerror = () => cb(r.error || new Error("read"));
+  r.readAsText(file);
+}
+if (LOCAL){
+  $("#baseBox").hidden = false; setFixLang("ru");
+  $("#fixLang").hidden = true; $("#fixLang").previousElementSibling.hidden = true;
+  $("#aiTags").hidden = true; $("#aiKz").hidden = true;
+  $("#importFile").addEventListener("change", e=>{
+    const f = e.target.files[0]; if(!f) return;
+    readBaseFile(f, (err, n)=>{ if (err){ $("#importErr").textContent = "Не удалось прочитать файл. Нужен файл базы Суфлёра (.json)."; return; } hideImport(); toast(`Загружено шаблонов: ${n}`); });
+  });
+  $("#importDemo").onclick = ()=>{ window.__SUFLER_LOCAL.replace(DEMO_SEED); hideImport(); toast("Загружены примеры"); };
+  $("#baseFile").addEventListener("change", e=>{
+    const f = e.target.files[0]; if(!f) return;
+    readBaseFile(f, (err, n)=>{ $("#baseNote").textContent = err ? "Не удалось прочитать файл." : `Загружено шаблонов: ${n}. Прежняя база заменена.`; e.target.value = ""; });
+  });
+  $("#baseExport").onclick = ()=>{
+    const blob = new Blob([JSON.stringify({app:"sufler", version:1, exportedAt:new Date().toISOString(), data: window.__SUFLER_LOCAL.dump()})], {type:"application/json"});
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = "sufler-base-" + new Date().toISOString().slice(0,10) + ".json";
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+    $("#baseNote").textContent = "Файл скачан.";
+  };
+}
+
+/* five ready variants per typical situation: вежливо, с эмпатией, коротко, простыми словами, по-человечески */
+const SIT_VARIANTS = [
+  ["{привет}! Меня зовут {имя}. Благодарю за обращение, изучаю ваш вопрос и скоро вернусь с ответом.", "{привет}! Меня зовут {имя}. Понимаю, что вопрос важен для вас, — уже разбираюсь и скоро всё подскажу.", "{привет}! Изучаю ваш вопрос, скоро отвечу.", "{привет}! Меня зовут {имя}. Смотрю ваш вопрос, скоро напишу ответ.", "{привет}! Меня зовут {имя}. С радостью помогу. Уже смотрю ваш вопрос, скоро вернусь!"],
+  ["{привет}! Меня зовут {имя}. Чем могу вам помочь?", "{привет}! Меня зовут {имя}. Расскажите, что случилось, — постараюсь помочь.", "{привет}! Чем могу помочь?", "{привет}! Напишите, пожалуйста, ваш вопрос.", "{привет}! Меня зовут {имя}. С радостью помогу. Что у вас случилось?"],
+  ["Благодарим за обращение! Изучаю ваш вопрос, в ближайшее время вернусь с ответом.", "Понимаю, что вопрос важен для вас. Уже изучаю ситуацию и скоро вернусь с ответом.", "Изучаю ваш вопрос, скоро отвечу.", "Смотрю ваш вопрос. Скоро напишу ответ.", "Спасибо, что написали! Уже разбираюсь, скоро всё подскажу."],
+  ["Пожалуйста, ожидайте, я ещё проверяю информацию. Благодарим за терпение!", "Понимаю, что ждать неприятно. Проверка ещё идёт, я обязательно вернусь с ответом. Спасибо за терпение!", "Пожалуйста, ожидайте, проверяю.", "Ещё проверяю. Подождите, пожалуйста, немного.", "Ещё немного — заканчиваю проверку. Спасибо, что ждёте!"],
+  ["Благодарим за ожидание! ", "Спасибо за терпение и за то, что дождались ответа! ", "Спасибо за ожидание! ", "Спасибо, что подождали! ", "Спасибо, что дождались! "],
+  ["Приносим извинения за долгое ожидание. Сейчас поступает большое количество обращений, но мы не забыли о вас и ответим в ближайшее время.", "Простите, что приходится ждать так долго. Сейчас очень много обращений, но ваш вопрос у нас на виду — скоро ответим.", "Извините за ожидание: много обращений. Скоро ответим.", "Извините, что долго. Сейчас много сообщений, но мы про вас помним и скоро ответим.", "Извините, что заставили ждать — сегодня очень много обращений. Мы про вас не забыли, скоро всё подскажем!"],
+  ["Уточните, пожалуйста, ваш вопрос подробнее, чтобы мы могли вам помочь.", "Хотим разобраться в вашей ситуации как можно точнее. Уточните, пожалуйста, подробности.", "Уточните, пожалуйста, детали вопроса.", "Напишите, пожалуйста, подробнее, что произошло.", "Расскажите чуть подробнее, что случилось, — так я быстрее помогу."],
+  ["Ваше обращение передано профильным специалистам. Они изучат ситуацию и свяжутся с вами.", "Понимаем важность вашего вопроса и уже передали его профильным специалистам. Они внимательно всё изучат и свяжутся с вами.", "Передали обращение специалистам, они свяжутся с вами.", "Мы отправили ваш вопрос специалистам. Они проверят и ответят вам.", "Ваш вопрос уже у специалистов. Они во всём разберутся и обязательно с вами свяжутся."],
+  ["Ваше обращение находится в работе у профильных специалистов. Как только они завершат проверку, мы сразу сообщим вам результат.", "Понимаем, что ждать непросто. Ваша заявка в работе у специалистов, и мы держим её на контроле — сообщим результат сразу, как он появится.", "Заявка в работе у специалистов, ответ сообщим сразу.", "Ваш вопрос ещё проверяют специалисты. Как только будет ответ, мы напишем.", "Ваша заявка всё ещё у специалистов. Как только они закончат, сразу дадим знать!"],
+  ["Понимаем, что ожидание затянулось, и приносим извинения. Ваша заявка всё ещё на рассмотрении у специалистов, мы держим её на контроле.", "Нам очень жаль, что ответ занимает столько времени. Ваша заявка не потерялась: специалисты продолжают работу, и мы сообщим результат сразу, как он будет готов.", "Извините за ожидание, заявка ещё в работе. Ответ сообщим сразу.", "Извините, что так долго. Специалисты ещё проверяют вашу заявку. Повторно писать не нужно — мы сами напишем.", "Простите, что всё ещё ждёте. Заявка у специалистов, мы следим за ней и сразу напишем, как будет ответ."],
+  ["Вы на связи? Если вопрос ещё актуален, напишите, пожалуйста.", "Вы на связи? Хотим убедиться, что ваш вопрос решён. Если нужна помощь — напишите, пожалуйста.", "Вы на связи?", "Вы ещё здесь? Если вопрос остался, напишите.", "Вы ещё с нами? Если вопрос остался — пишите, помогу!"],
+  ["Рады были помочь! Если появятся вопросы — пишите, мы всегда на связи. {пока}!", "Спасибо за обращение и за терпение! Если что-то ещё понадобится, мы всегда рядом. {пока}!", "Рады помочь! {пока}!", "Если будут вопросы — пишите. {пока}!", "Было приятно помочь! Пишите, если что. {пока}!"],
+];
+
+/* word-level rules: Cyrillic-aware boundaries */
+const wre = (p, f) => new RegExp(`(^|[^\\p{L}])(${p})(?=$|[^\\p{L}])`, f || "giu");
+const keepCase = (src, rep) => src[0] && src[0] === src[0].toUpperCase() && src[0] !== src[0].toLowerCase() ? rep[0].toUpperCase() + rep.slice(1) : rep;
+const ABBR = [
+  ["здр|здра|здрав|здравст|здравств|здравствуй|здрасте|здрасьте|здраст|здрасти", "здравствуйте"],
+  ["прив|привет|приветик|салам|сәлем|салем", "здравствуйте"],
+  ["фридом банк|фридомбанк|фридом банка|фридом банке", "Freedom Bank"], ["фридом|фридоме|фридома", "Freedom"], ["суперапп|супер апп|суперап", "Freedom SuperApp"],
+  ["скрин|скрины|скрином", "скриншот"], ["смс|sms", "SMS"], ["иин", "ИИН"], ["чси", "ЧСИ"], ["цон", "ЦОН"], ["енпф", "ЕНПФ"],
+  ["епв", "ЕПВ"], ["бин", "БИН"], ["мфо", "МФО"], ["пдп", "ПДП"], ["чдп", "ЧДП"], ["qr|кьюар", "QR"], ["есим|esim", "eSIM"],
+  ["спс|спасиб|пасиб|сяп", "спасибо"],
+  ["пж|пжл|пжлст|плз|плиз|пожалуйсто|пожалусто", "пожалуйста"],
+  ["щас|щя|счас|ща", "сейчас"],
+  ["ок|окей|оке", "хорошо"], ["норм", "хорошо"],
+  ["ч[её]|чо", "что"], ["чтоб", "чтобы"], ["тк|т\\.к", "так как"],
+  ["инфа|инфу|инфы", "информацию"], ["прил|прила|приле|прилу|прилке|прилку", "приложение"],
+  ["вопр", "вопрос"], ["изуч", "изучаю"], ["поддерж|поодерж|подд", "поддержки"],
+  ["мин", "минуту"], ["сек", "секунду"], ["спец|спецы|спецам|спецами", "специалисты"],
+  ["тикет|тикета", "заявка"], ["оч", "очень"], ["щас гляну|гляну", "посмотрю"],
+];
+const YOU = [
+  ["тебе", "вам"], ["тебя", "вас"], ["ты", "вы"], ["тобой", "вами"], ["твой", "ваш"], ["твоя", "ваша"], ["твое|твоё", "ваше"], ["твои", "ваши"],
+  ["твоего", "вашего"], ["твоей", "вашей"], ["твоих", "ваших"], ["твою", "вашу"],
+  ["жди", "ожидайте"], ["подожди", "подождите"], ["напиши", "напишите"], ["скинь|кинь", "отправьте"], ["отправь", "отправьте"],
+  ["проверь", "проверьте"], ["зайди", "зайдите"], ["открой", "откройте"], ["нажми", "нажмите"], ["обратись", "обратитесь"],
+  ["позвони", "позвоните"], ["сделай", "сделайте"], ["скажи", "скажите"], ["уточни", "уточните"], ["дай", "дайте"],
+  ["пришли", "пришлите"], ["попробуй", "попробуйте"], ["обнови", "обновите"], ["перезагрузи", "перезагрузите"], ["выбери", "выберите"],
+  ["можешь", "можете"], ["хочешь", "хотите"], ["знаешь", "знаете"], ["получишь", "получите"], ["сможешь", "сможете"], ["увидишь", "увидите"],
+];
+const PHRASES = [
+  [/^\s*(ч[её]|что|чо)\s*(тебе|вам)?\s*(надо|нужно)\s*\??\s*$/iu, "Чем могу вам помочь?"],
+  [/^\s*(чем помочь|чем могу помочь)\s*\??\s*$/iu, "Чем могу вам помочь?"],
+  [/^\s*(понял|поняла|ясно|принял|приняла)\s*\.?\s*$/iu, "Поняла вас, спасибо за информацию."],
+];
+const SIMPLE = [
+  [/в связи с тем,? что/giu, "потому что"], [/в настоящее время/giu, "сейчас"], [/денежные средства/giu, "деньги"], [/денежных средств/giu, "денег"],
+  [/посредством/giu, "через"], [/произвести оплату/giu, "оплатить"], [/осуществить/giu, "сделать"], [/осуществляется/giu, "делается"],
+  [/по истечении/giu, "после"], [/в целях/giu, "чтобы"], [/является/giu, "это"], [/данн(ый|ая|ое|ые|ого|ой|ым|ую)/giu, (m,e)=>({"ый":"этот","ая":"эта","ое":"это","ые":"эти","ого":"этого","ой":"этой","ым":"этим","ую":"эту"})[e.toLowerCase()]||m],
+];
+function applyRules(t){
+  for (const [re, rep] of PHRASES) if (re.test(t)) return rep;
+  t = t.replace(/[,.]?\s*(чем)\s+(я\s+)?(могу|можем)\s+(вам\s+)?помочь\s*[.?!]?/giu, (m, a, b, c)=> ". Чем " + c + " вам помочь? ").replace(/^\s*\.\s*/, "");
+  for (const [p, rep] of ABBR) t = t.replace(wre(p), (m, b, w)=> b + keepCase(w, rep));
+  for (const [p, rep] of YOU) t = t.replace(wre(p), (m, b, w)=> b + keepCase(w, rep));
+  t = t.replace(/([^\s.,!?])\s+(ожидайте|подождите)\s*[.!]?\s*$/iu, "$1. Пожалуйста, ожидайте.");
+  return t;
+}
+function tidy(t){
+  t = t.replace(/^\s*здравствуйте\s*[.,!]?\s*/iu, "Здравствуйте! ");
+  t = t.replace(/[ \t]+/g, " ").replace(/ +([,.!?;:])/g, "$1").replace(/([,.!?;:])(?=[\p{L}])/gu, "$1 ").trim();
+  t = t.replace(/(^|[.!?]\s+|\n\s*)(\p{Ll})/gu, (m, a, c)=> a + c.toUpperCase());
+  if (t && !/[.!?…)]$/.test(t)) t += /^(как|что|где|когда|почему|зачем|какой|какая|какие|можно|могу|могли|сколько|чем|вы на связи|подскажите|уточните)/iu.test(t) ? "?" : ".";
+  return t;
+}
+function simplify(t){ for (const [re, rep] of SIMPLE) t = t.replace(re, rep); return t; }
+function splitGreeting(t){ const m = t.match(/^((?:здравствуйте|доброе утро|добрый день|добрый вечер)[!.,]?\s*)/iu); return m ? [m[1].replace(/[!.,]?\s*$/, "! "), t.slice(m[1].length)] : ["", t]; }
+function firstSentence(t){ const [g, rest] = splitGreeting(t); const m = rest.match(/^.*?[.!?…](\s|$)/su); return (g + (m ? m[0] : rest)).trim(); }
+function makeVariants(C){
+  const [g, rest] = splitGreeting(C);
+  const isQ = /\?\s*$/.test(C);
+  const v = [
+    ["вежливо", isQ ? C : `${C} Если у вас остались вопросы, мы готовы помочь.`],
+    ["с эмпатией", `${g}Понимаем, как это важно для вас. ${rest} Мы сделаем всё возможное, чтобы помочь.`],
+    ["коротко", firstSentence(C)],
+    ["простыми словами", simplify(C)],
+    ["по-человечески", `${g}Спасибо, что написали! ${rest}${isQ ? "" : " Обращайтесь, если что-то ещё понадобится!"}`],
+  ];
+  return v.map(([style, text])=>({style, text: tidy(text.replace(/\s+/g, " "))}));
+}
+
+/* spelling: LanguageTool public API, suggestions ranked by how often the word appears in our own templates */
+let vocab = null; var vocabDirty = true;
+function getVocab(){
+  if (vocab && !vocabDirty) return vocab; vocabDirty = false;
+  vocab = new Map();
+  for (const t of items.values()) for (const w of ((t.ru||"") + " " + (t.title||"")).toLowerCase().match(/\p{L}+/gu) || []) vocab.set(w, (vocab.get(w)||0) + 1);
+  return vocab;
+}
+let ltCache = new Map(), ltCtl = null;
+async function spellcheck(text){
+  if (ltCache.has(text)) return ltCache.get(text);
+  ltCtl?.abort(); const ctl = ltCtl = new AbortController();
+  const timer = setTimeout(()=>ctl.abort(), 5000);
+  try{
+    const r = await fetch("https://api.languagetool.org/v2/check", {method:"POST", signal: ctl.signal, headers:{"Content-Type":"application/x-www-form-urlencoded"}, body: new URLSearchParams({text, language:"ru-RU", disabledCategories:"STYLE,REDUNDANCY"})});
+    if (!r.ok) throw new Error("lt " + r.status);
+    const j = await r.json();
+    const V = getVocab();
+    let out = text;
+    const ms = (j.matches||[]).filter(m=>m.replacements && m.replacements.length).sort((a,b)=>b.offset - a.offset);
+    for (const m of ms){
+      const orig = text.substr(m.offset, m.length);
+      if ((V.get(orig.toLowerCase())||0) >= 3) continue; // a word our templates use: keep it (Freedom, eSIM, …)
+      const cands = m.replacements.slice(0, 6).map(x=>x.value);
+      let best = cands[0], bestN = -1;
+      cands.forEach((c, i)=>{ const n = (c.toLowerCase().match(/\p{L}+/gu)||[]).reduce((s,w)=>s + (V.get(w)||0), 0) - i*0.01; if (n > bestN){ bestN = n; best = c; } });
+      out = out.slice(0, m.offset) + best + out.slice(m.offset + m.length);
+    }
+    ltCache.set(text, out);
+    return out;
+  } finally { clearTimeout(timer); }
+}
+
+let localSeq = 0;
+async function runLocalFix(text){
+  const seq = ++localSeq;
+  renderFixTemplates();
+  const sit = instantIndex(text);
+  if (sit >= 0 && SIT_VARIANTS[sit]){
+    const vs = SIT_VARIANTS[sit].map((t, i)=>({style: REQUIRED_STYLES[i][0], text: fillT(t)}));
+    if (!outEdited) $("#fixOut").value = vs[0].text;
+    fixRu = vs[0].text; renderVariants(vs, 0); $("#fixState").textContent = "";
+    return;
+  }
+  // 1) instant: abbreviations, «ты» → «Вы», capitals and punctuation
+  let C = tidy(applyRules(text));
+  if (!outEdited) $("#fixOut").value = C;
+  renderVariants(makeVariants(C), 0);
+  $("#fixState").innerHTML = '<span class="spin"></span> проверяю орфографию…';
+  // 2) spelling and punctuation from LanguageTool
+  try{
+    const fixed = await spellcheck(applyRules(text));
+    if (seq !== localSeq) return;
+    C = tidy(applyRules(fixed));
+    if (!outEdited) $("#fixOut").value = C;
+    fixRu = C; renderVariants(makeVariants(C), 0); renderFixTemplates();
+    $("#fixState").textContent = "";
+  }catch(e){
+    if (seq !== localSeq || e?.name === "AbortError" && ltCtl?.signal?.aborted && seq !== localSeq) return;
+    $("#fixState").textContent = navigator.onLine === false ? "нет интернета — исправлены только сокращения" : "проверка орфографии недоступна, исправлены сокращения";
+  }
+}
 /* ---------- links ---------- */
 const GROUPS = ["Рабочие программы","Для клиентов"];
 let linkSel = 0, linkCurrent = [], editingLink = null;
@@ -962,6 +1489,13 @@ function initLinks(){
 
 /* ---------- boot ---------- */
 $("#fixIn").value = ls("sufler.fix")||"";
+if (!$("#fixIn").value.trim()) renderQuick();
+let lastPart = "";
+function updDayPart(){
+  const p = dayPart(); $("#dayPartNote").textContent = `сейчас ${PART_NAME[p]} · «${GREET.ru[p]}»`;
+  if (p !== lastPart){ lastPart = p; if (quickMode) renderQuick(); }
+}
+updDayPart(); setInterval(updDayPart, 60000);
 render();
 { const sv = ls("sufler.view"); setView(VIEWS.includes(sv) && sv!=="add" ? sv : (sv==="tr" ? "fix" : "search")); }
 initDb();
