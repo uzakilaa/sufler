@@ -41,6 +41,13 @@
     <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="m11.2 11.8 8.3-8.3M16 7l3 3M14 9l2 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
     <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
     <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-wave" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-4 4v-4H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 9.5h8M8 12.5h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 7.5V12l3 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M4 12 20 4l-4 16-4-6.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m12 13.5 8-9.5" stroke="currentColor" stroke-width="1.8"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-doc" viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 12h5M10 15.5h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-loop" viewBox="0 0 24 24"><path d="M19 8a7.5 7.5 0 0 0-13.5 1M5 16a7.5 7.5 0 0 0 13.5-1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M19 3.5V8h-4.5M5 20.5V16h4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 5 6v5.5c0 4.5 3 8 7 9.5 4-1.5 7-5 7-9.5V6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m9 12 2.2 2.2L15.5 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5zM4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
   </svg>
 
@@ -137,6 +144,13 @@
             </div>
           </div>
         </div>
+        <div class="suggest" id="suggest" hidden>
+          <div class="tones-head">
+            <h2>Похоже, подойдёт шаблон</h2>
+            <span class="pane-hint">по словам из черновика · клик — скопировать</span>
+          </div>
+          <div class="suggest-list" id="suggest-list"></div>
+        </div>
         <div class="tones" id="tones" hidden>
           <div class="tones-head">
             <h2>Другим тоном</h2>
@@ -144,6 +158,14 @@
           </div>
           <div class="tones-list" id="tones-list"></div>
         </div>
+        <section class="flow" aria-label="Быстрые фразы">
+          <div class="flow-head">
+            <h2>Быстрые фразы</h2>
+            <span class="pane-hint">клик — скопировать · наведите, чтобы прочитать</span>
+            <label class="flow-name">Меня зовут <input id="op-name" maxlength="40" placeholder="ваше имя" autocomplete="off" spellcheck="false"></label>
+          </div>
+          <div class="flow-map" id="flow-map"></div>
+        </section>
         <p class="honest">Я корректор на правилах, а не нейросеть: дописываю обрывки слов, чиню опечатки, ставлю заглавные, точки и частые запятые. Причастные обороты и сложные предложения — пока ваше.</p>
       </section>
 

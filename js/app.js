@@ -40,6 +40,7 @@
     cat: 'all',            // выбранная тема шаблонов
     fill: {},              // значения из строки поиска (телефон, сумма, банк…)
     rest: '',              // строка поиска без этих значений
+    opName: '',            // имя оператора для {имя} в шаблонах
   };
 
   let device = store.get('device');
@@ -47,6 +48,7 @@
 
   state.lang = store.get('lang', 'ru') === 'kz' ? 'kz' : 'ru';
   state.cat = store.get('cat', 'all');
+  state.opName = store.get('opname', '');
 
   const corrector = C.createCorrector();
 
@@ -420,6 +422,7 @@
     lastResult = out;
     const box = $('#result');
     renderTones(out);
+    renderSuggest(draft, out);
     if (!out) {
       box.innerHTML = '<span class="placeholder">Тут появится текст, который не стыдно отправить клиенту.</span>';
       $('#changes-hint').textContent = '';
@@ -429,6 +432,99 @@
     box.innerHTML = parts.map((p) => (p.changed ? `<span class="chg">${esc(p.text)}</span>` : esc(p.text))).join('');
     const n = parts.filter((p) => p.changed).length;
     $('#changes-hint').textContent = n ? `поправлено слов: ${n}` : 'придраться не к чему';
+  }
+
+
+  /* ---------- Быстрые фразы: живая схема под корректором ---------- */
+  // title — по нему ищется шаблон в базе (текст можно править в шаблонах), text — запасной вариант.
+  const FLOW = [
+    { title: 'Приветствие', label: 'Приветствие', icon: 'i-wave', c: 1, r: 1,
+      text: 'Здравствуйте! На связи чат-поддержка Freedom Bank[[, меня зовут {имя}]]. Подскажите, пожалуйста, ваш вопрос.' },
+    { title: 'Приветствие + уточню и вернусь', label: 'Уточню и вернусь', icon: 'i-search', c: 3, r: 1,
+      text: 'Здравствуйте![[ Меня зовут {имя}.]] Уточню информацию по вашему вопросу и вернусь к вам через несколько минут.' },
+    { title: 'Приветствие + ожидайте', label: 'Ожидайте', icon: 'i-clock', c: 5, r: 1,
+      text: 'Здравствуйте![[ Меня зовут {имя}.]] Мне потребуется немного времени для уточнения деталей. Пожалуйста, ожидайте.' },
+    { title: 'Передали специалистам (тикет создан)', label: 'Передали специалистам', icon: 'i-send', c: 7, r: 1,
+      text: 'Мы передали ваш вопрос профильным специалистам для подробной проверки. Как только появится результат, мы обязательно сообщим вам. Спасибо за терпение!' },
+    { title: 'В работе: отметили как приоритетный', label: 'В работе · приоритет', icon: 'i-gear', c: 9, r: 1,
+      text: 'Проверили и видим, что ваше обращение всё ещё находится в работе у специалистов. Мы направили уведомление, чтобы ускорить решение, и отметили ваш вопрос как приоритетный. Просим немного подождать 🙏 — будем держать вопрос под контролем.' },
+    { title: 'Изучу переписку выше', label: 'Изучу переписку', icon: 'i-doc', c: 4, r: 2,
+      text: 'Спасибо за ваш запрос! Мне понадобится время, чтобы изучить переписку выше и подготовить ответ. Спасибо за терпение.' },
+    { title: 'Продолжаем работу, ожидайте', label: 'Продолжаем, ожидайте', icon: 'i-loop', c: 6, r: 2,
+      text: 'Продолжаем работу по вашему запросу. Пожалуйста, ожидайте — это может занять некоторое время.' },
+    { title: 'В работе: на постоянном контроле', label: 'В работе · на контроле', icon: 'i-shield', c: 8, r: 2,
+      text: 'Проверили и видим, что ваш запрос всё ещё в работе у специалистов. После завершения проверки и анализа предоставленных вами данных мы обязательно свяжемся с вами и сообщим результат. Ваш вопрос находится на постоянном контроле. 🤝' },
+  ];
+  const flowText = (n) => {
+    const t = state.templates.find((x) => x.title === n.title);
+    return F.render(t ? t.body : n.text, fillVals());
+  };
+
+  function renderFlow() {
+    $('#flow-map').innerHTML = FLOW.map((n, i) => `
+      <button class="flow-node${n.r === 2 ? ' branch' : ''}" type="button" data-i="${i}" style="--c:${n.c};--r:${n.r};--d:${(i * 0.7) % 3.1}s">
+        <span class="flow-ico"><svg><use href="#${n.icon}"/></svg></span>
+        <span class="flow-label">${esc(n.label)}</span>
+        <span class="flow-tip">${esc(flowText(n))}</span>
+      </button>`).join('');
+  }
+
+  /* ---------- Подсказка шаблонов по черновику: «в работе сорри» → шаблоны «в работе» ---------- */
+  let suggestList = [];
+  function renderSuggest(draft, out) {
+    const text = norm(draft + '\n' + out);
+    const words = norm(draft).split(/\s+/).filter(Boolean).length;
+    const found = [];
+    if (words) {
+      for (const t of state.templates) {
+        let best = 0;
+        for (const k of kwRaw(t).map(norm)) {
+          if (k.length < 3 || /^\d+$/.test(k)) continue;
+          // короткие ключи вроде «прив» срабатывают только в коротком черновике
+          if (words > 3 && k.length < 5 && !k.includes(' ')) continue;
+          if (wordHit(text, k)) best = Math.max(best, k.length + (k.includes(' ') ? 4 : 0));
+        }
+        if (best) found.push({ t, best });
+      }
+    }
+    suggestList = found.sort((a, b) => b.best - a.best).slice(0, 3).map((x) => x.t);
+    const box = $('#suggest');
+    box.hidden = !suggestList.length;
+    $('#suggest-list').innerHTML = suggestList.map((t, i) => `
+      <button class="sug" type="button" data-i="${i}" style="--i:${i}">
+        <span class="sug-cat">${esc(catOf(t))}</span>
+        <b>${esc(t.title)}</b>
+        <span class="sug-text">${esc(F.render(t.body, fillVals()))}</span>
+      </button>`).join('');
+  }
+
+  function bindFlow() {
+    const name = $('#op-name');
+    name.value = state.opName;
+    name.addEventListener('input', () => {
+      state.opName = name.value.trim();
+      store.set('opname', state.opName);
+      renderFlow();
+    });
+    $('#flow-map').addEventListener('click', async (ev) => {
+      const b = ev.target.closest('.flow-node');
+      if (!b) return;
+      if (await copyText(flowText(FLOW[b.dataset.i]))) {
+        bubble(ev.clientX || b.getBoundingClientRect().left + 30, (ev.clientY || b.getBoundingClientRect().top) - 6);
+        b.classList.add('copied');
+        setTimeout(() => b.classList.remove('copied'), 900);
+      }
+    });
+    $('#suggest-list').addEventListener('click', async (ev) => {
+      const b = ev.target.closest('.sug');
+      if (!b || !suggestList[b.dataset.i]) return;
+      if (await copyText(F.render(suggestList[b.dataset.i].body, fillVals()))) {
+        bubble(ev.clientX, ev.clientY - 6);
+        b.classList.add('copied');
+        setTimeout(() => b.classList.remove('copied'), 900);
+      }
+    });
+    renderFlow();
   }
 
   let toneList = [];
@@ -641,7 +737,7 @@
   }
 
   // Порядок тем в списке; темы, которых здесь нет, идут следом по алфавиту.
-  const CAT_ORDER = ['Идентификация', 'Кредиты', 'ПТ и аресты', 'Переводы', 'Карты', 'Кешбэк', 'Bilim и Power Card',
+  const CAT_ORDER = ['Быстрые фразы', 'Идентификация', 'Кредиты', 'ПТ и аресты', 'Переводы', 'Карты', 'Кешбэк', 'Bilim и Power Card',
     'Реферальная программа', 'Freedom Валюта', 'Рейтинг и eGov', 'Госуслуги', 'eSIM', 'Депозиты и лояльность', 'ВАРМ',
     'Сервисы и подписки', 'Приложение', 'Выписки и справки', 'Контакты', 'Уточнения', 'Прочее'];
   const NO_CAT = 'Без темы';
@@ -717,16 +813,21 @@
   const MARK = ['\uE010', '\uE011'];
   function tplText(t, lang, mark) {
     const src = lang === 'kz' && tplHasKz(t) ? t.body_kz : t.body;
-    return F.render(src, state.fill, mark);
+    return F.render(src, fillVals(), mark);
   }
+  // Значения из поиска + имя оператора
+  const fillVals = () => (state.opName ? { ...state.fill, name: state.opName } : state.fill);
   const unmark = (html) => html.replace(/\uE010/g, '<span class="filled">').replace(/\uE011/g, '</span>');
 
   function fillNote(t) {
     const keys = F.placeholders(t.body + ' ' + (t.body_kz || ''));
     if (!keys.length) return '';
-    const got = keys.filter((k) => state.fill[k]);
+    const vals = fillVals();
+    const got = keys.filter((k) => vals[k]);
+    const miss = keys.filter((k) => !vals[k] && k !== 'name');
     if (got.length) return `<span class="tpl-fill ok">✓ подставлено: ${esc(got.map((k) => F.LABELS[k]).join(', '))}</span>`;
-    return `<span class="tpl-fill">можно подставить: ${esc(keys.map((k) => F.LABELS[k]).join(', '))} — допишите в поиск</span>`;
+    if (!miss.length) return '<span class="tpl-fill">своё имя впишите на вкладке «Корректор» — встанет в текст</span>';
+    return `<span class="tpl-fill">можно подставить: ${esc(miss.map((k) => F.LABELS[k]).join(', '))} — допишите в поиск</span>`;
   }
 
   function termsRegex(q) {
@@ -797,6 +898,7 @@
   }
 
   function renderTemplates() {
+    if (state.templates.length) { renderFlow(); renderSuggest($('#draft').value, lastResult || ''); }
     const q = $('#search').value;
     const searching = !!q.trim();
     const res = searchTemplates(q);
@@ -1295,6 +1397,7 @@
     bindCorrector();
     bindDict();
     bindTemplates();
+    bindFlow();
     bindOwner();
     bindLayers();
     bindGlobal();

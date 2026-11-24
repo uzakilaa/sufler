@@ -392,6 +392,12 @@
         for (const e of ['тся', 'ться']) if (known(base + e)) return one(base + e);
         if (/[аеиуюя]$/.test(base)) return one(base + 'тся');
       }
+      // Залипла клавиша: «работее» → «работе», «спасибоо» → «спасибо»
+      for (let i = 1; i < t.length; i++) {
+        if (t[i] !== t[i - 1]) continue;
+        const w = t.slice(0, i) + t.slice(i + 1);
+        if (known(w)) return { cost: 0, cands: [{ w, g: -1, tags: '', i: 0, cost: 0 }] };
+      }
       const r = candidates(t);
       if (!r) return null;
       if (plausible(t)) {
