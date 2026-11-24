@@ -108,7 +108,7 @@
       saveTemplate: (token, t) => run((db) => {
         auth(db, token, 'admin');
         if (!t.keyword.trim() || !t.title.trim() || !t.body.trim()) throw err('VALIDATION');
-        const row = { keyword: t.keyword.trim(), title: t.title.trim(), body: t.body.trim(), link: (t.link || '').trim() || null };
+        const row = { keyword: t.keyword.trim(), title: t.title.trim(), category: (t.category || '').trim() || null, body: t.body.trim(), body_kz: (t.body_kz || '').trim() || null, link: (t.link || '').trim() || null };
         if (t.id) {
           const ex = db.templates.find((x) => x.id === t.id);
           if (!ex) throw err('NOT_FOUND');
@@ -130,7 +130,7 @@
         let inserted = 0;
         for (const x of items) {
           if (!x.keyword || !x.title || !x.body) continue;
-          db.templates.push({ id: ++db.seq, keyword: x.keyword.trim(), title: x.title.trim(), body: x.body.trim(), link: (x.link || '').trim() || null });
+          db.templates.push({ id: ++db.seq, keyword: x.keyword.trim(), title: x.title.trim(), category: (x.category || '').trim() || null, body: x.body.trim(), body_kz: (x.body_kz || '').trim() || null, link: (x.link || '').trim() || null });
           inserted++;
         }
         return { inserted };

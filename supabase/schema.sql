@@ -10,13 +10,26 @@ create extension if not exists pgcrypto with schema extensions;
 
 create table if not exists public.templates (
   id          bigint generated always as identity primary key,
-  keyword     text not null check (length(trim(keyword)) between 1 and 60),
+  keyword     text not null,                     -- ключевые слова через запятую
   title       text not null check (length(trim(title)) between 1 and 200),
+  category    text,                              -- тема: «Кредиты», «Контакты»…
   body        text not null check (length(trim(body)) between 1 and 10000),
+  body_kz     text,                              -- текст на казахском (необязательно)
   link        text check (link is null or length(link) <= 1000),
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
+
+-- Обновление базы, созданной первой версией скрипта: тема, казахский текст, длинный список ключей.
+alter table public.templates add column if not exists category text;
+alter table public.templates add column if not exists body_kz  text;
+alter table public.templates drop constraint if exists templates_keyword_check;
+alter table public.templates drop constraint if exists templates_keyword_len;
+alter table public.templates add constraint templates_keyword_len check (length(trim(keyword)) between 1 and 300);
+alter table public.templates drop constraint if exists templates_category_len;
+alter table public.templates add constraint templates_category_len check (category is null or length(category) <= 60);
+alter table public.templates drop constraint if exists templates_body_kz_len;
+alter table public.templates add constraint templates_body_kz_len check (body_kz is null or length(body_kz) <= 10000);
 
 -- Сокращения (kind = 'shortcut') и словарь опечаток (kind = 'typo') для корректора.
 create table if not exists public.shortcuts (
@@ -270,8 +283,10 @@ $$;
 
 -- ---------- Шаблоны ----------
 
+drop function if exists public.template_save(text, bigint, text, text, text, text);
 create or replace function public.template_save(
-  p_token text, p_id bigint, p_keyword text, p_title text, p_body text, p_link text default null)
+  p_token text, p_id bigint, p_keyword text, p_title text, p_body text, p_link text default null,
+  p_category text default null, p_body_kz text default null)
 returns json
 language plpgsql security definer
 set search_path = public, extensions
@@ -284,12 +299,15 @@ begin
     raise exception 'VALIDATION';
   end if;
   if p_id is null then
-    insert into public.templates (keyword, title, body, link)
-    values (trim(p_keyword), trim(p_title), trim(p_body), nullif(trim(coalesce(p_link, '')), ''))
+    insert into public.templates (keyword, title, category, body, body_kz, link)
+    values (trim(p_keyword), trim(p_title), nullif(trim(coalesce(p_category, '')), ''), trim(p_body),
+            nullif(trim(coalesce(p_body_kz, '')), ''), nullif(trim(coalesce(p_link, '')), ''))
     returning * into t;
   else
     update public.templates
        set keyword = trim(p_keyword), title = trim(p_title), body = trim(p_body),
+           category = nullif(trim(coalesce(p_category, '')), ''),
+           body_kz = nullif(trim(coalesce(p_body_kz, '')), ''),
            link = nullif(trim(coalesce(p_link, '')), ''), updated_at = now()
      where id = p_id
     returning * into t;
@@ -312,7 +330,7 @@ end;
 $$;
 
 -- Первичная загрузка шаблонов одним импортом (только владелец).
--- p_items: [{"keyword": "...", "title": "...", "body": "...", "link": "..."}, ...]
+-- p_items: [{"keyword": "...", "title": "...", "category": "...", "body": "...", "body_kz": "...", "link": "..."}, ...]
 create or replace function public.templates_import(p_token text, p_items jsonb, p_replace boolean default false)
 returns json
 language plpgsql security definer
@@ -328,8 +346,11 @@ begin
   if p_replace then
     delete from public.templates where id is not null;
   end if;
-  insert into public.templates (keyword, title, body, link)
-  select left(trim(x ->> 'keyword'), 60), left(trim(x ->> 'title'), 200), left(trim(x ->> 'body'), 10000),
+  insert into public.templates (keyword, title, category, body, body_kz, link)
+  select left(trim(x ->> 'keyword'), 300), left(trim(x ->> 'title'), 200),
+         nullif(left(trim(coalesce(x ->> 'category', '')), 60), ''),
+         left(trim(x ->> 'body'), 10000),
+         nullif(left(trim(coalesce(x ->> 'body_kz', '')), 10000), ''),
          nullif(trim(coalesce(x ->> 'link', '')), '')
     from jsonb_array_elements(p_items) as x
    where coalesce(trim(x ->> 'keyword'), '') <> ''
@@ -432,7 +453,7 @@ revoke execute on function public.add_access_code(text, text, int, text) from pu
 grant execute on function public.login(text, text)                                   to anon, authenticated;
 grant execute on function public.logout(text)                                        to anon, authenticated;
 grant execute on function public.session_status(text)                                to anon, authenticated;
-grant execute on function public.template_save(text, bigint, text, text, text, text) to anon, authenticated;
+grant execute on function public.template_save(text, bigint, text, text, text, text, text, text) to anon, authenticated;
 grant execute on function public.template_delete(text, bigint)                       to anon, authenticated;
 grant execute on function public.templates_import(text, jsonb, boolean)              to anon, authenticated;
 grant execute on function public.shortcut_save(text, bigint, text, text, text)       to anon, authenticated;

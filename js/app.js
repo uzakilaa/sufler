@@ -3,6 +3,7 @@
   'use strict';
 
   const C = window.SuflerCorrector;
+  const F = window.SuflerFill;
   const cfg = window.SUFLER_CONFIG || {};
   const api = cfg.supabaseUrl && cfg.supabaseKey ? window.SuflerSupabase(cfg) : window.SuflerMock();
 
@@ -35,10 +36,17 @@
     tab: 'corrector',
     dictKind: 'shortcut',
     openTemplateId: null,
+    lang: 'ru',            // язык копирования шаблонов: ru | kz
+    cat: 'all',            // выбранная тема шаблонов
+    fill: {},              // значения из строки поиска (телефон, сумма, банк…)
+    rest: '',              // строка поиска без этих значений
   };
 
   let device = store.get('device');
   if (!device) { device = Math.random().toString(36).slice(2) + Date.now().toString(36); store.set('device', device); }
+
+  state.lang = store.get('lang', 'ru') === 'kz' ? 'kz' : 'ru';
+  state.cat = store.get('cat', 'all');
 
   const corrector = C.createCorrector();
 
@@ -411,6 +419,7 @@
     const out = corrector.correct(draft);
     lastResult = out;
     const box = $('#result');
+    renderTones(out);
     if (!out) {
       box.innerHTML = '<span class="placeholder">Тут появится текст, который не стыдно отправить клиенту.</span>';
       $('#changes-hint').textContent = '';
@@ -420,6 +429,19 @@
     box.innerHTML = parts.map((p) => (p.changed ? `<span class="chg">${esc(p.text)}</span>` : esc(p.text))).join('');
     const n = parts.filter((p) => p.changed).length;
     $('#changes-hint').textContent = n ? `поправлено слов: ${n}` : 'придраться не к чему';
+  }
+
+  let toneList = [];
+  function renderTones(text) {
+    toneList = text ? window.SuflerTones.variants(text) : [];
+    const wrap = $('#tones');
+    wrap.hidden = !toneList.length;
+    $('#tones-list').innerHTML = toneList.map((v, i) => `
+      <button class="tone" type="button" data-i="${i}" style="--i:${i}">
+        <span class="tone-label">${esc(v.label)}</span>
+        <span class="tone-hint">${esc(v.hint)}</span>
+        <span class="tone-text">${esc(v.text)}</span>
+      </button>`).join('');
   }
 
   async function copyResult(clear) {
@@ -448,6 +470,15 @@
     $('#btn-copy').addEventListener('click', () => copyResult(false));
     $('#btn-clear').addEventListener('click', () => { draft.value = ''; store.del('draft'); renderResult(); draft.focus(); });
     $('#btn-dict').addEventListener('click', openDict);
+    $('#tones-list').addEventListener('click', async (ev) => {
+      const b = ev.target.closest('.tone');
+      if (!b || !toneList[b.dataset.i]) return;
+      if (await copyText(toneList[b.dataset.i].text)) {
+        bubble(ev.clientX, ev.clientY - 6);
+        b.classList.add('copied');
+        setTimeout(() => b.classList.remove('copied'), 900);
+      }
+    });
     renderResult();
   }
 
@@ -609,25 +640,93 @@
     }
   }
 
-  function searchTemplates(q) {
-    const nq = norm(q.trim()).replace(/\s+/g, ' ');
-    const list = state.templates;
-    if (!nq) return [...list].sort((a, b) => a.title.localeCompare(b.title, 'ru')).map((t) => ({ t, rank: 9 }));
+  // Порядок тем в списке; темы, которых здесь нет, идут следом по алфавиту.
+  const CAT_ORDER = ['Идентификация', 'Кредиты', 'ПТ и аресты', 'Переводы', 'Карты', 'Кешбэк', 'Bilim и Power Card',
+    'Реферальная программа', 'Freedom Валюта', 'Рейтинг и eGov', 'Госуслуги', 'eSIM', 'Депозиты и лояльность', 'ВАРМ',
+    'Сервисы и подписки', 'Приложение', 'Выписки и справки', 'Контакты', 'Уточнения', 'Прочее'];
+  const NO_CAT = 'Без темы';
+  const catOf = (t) => (t.category && t.category.trim()) || NO_CAT;
+  const catRank = (c) => { const i = CAT_ORDER.indexOf(c); return c === NO_CAT ? 999 : i < 0 ? 500 : i; };
+  const byCat = (a, b) => catRank(a) - catRank(b) || a.localeCompare(b, 'ru');
+
+  const LETTER = /[a-zа-я0-9әғқңөұүһі]/;
+  // Совпадение с начала слова: «пт» найдёт «пт комиссия», но не «оптом».
+  function wordHit(text, term) {
+    if (!term) return false;
+    for (let i = text.indexOf(term); i >= 0; i = text.indexOf(term, i + 1)) {
+      if (i === 0 || !LETTER.test(text[i - 1])) return true;
+    }
+    return false;
+  }
+  const kwRaw = (t) => String(t.keyword || '').split(/[,;]/).map((s) => s.trim()).filter(Boolean);
+
+  function rankOne(t, nq) {
+    if (!nq) return null;
+    const ks = kwRaw(t).map(norm);
+    const kAll = ks.join(' , ');
+    const ti = norm(t.title);
+    const b = norm(t.body) + '\n' + norm(t.body_kz);
+    if (ks.includes(nq)) return 0;
+    if (ks.some((k) => k.startsWith(nq))) return 1;
+    if (ks.some((k) => wordHit(k, nq))) return 1.5;
+    if (wordHit(ti, nq)) return 2;
+    if (wordHit(b, nq)) return 3;
     const terms = nq.split(' ');
+    if (terms.length > 1 && terms.every((w) => wordHit(kAll, w) || wordHit(ti, w) || wordHit(b, w))) {
+      return terms.every((w) => wordHit(kAll, w)) ? 3.5 : 4;
+    }
+    return null;
+  }
+
+  // Поиск. Номера, суммы, банки из строки поиска запоминаются в state.fill и подставляются в текст.
+  function searchTemplates(q) {
+    const raw = q.trim();
+    const ex = F.extract(raw);
+    state.fill = raw ? ex.values : {};
+    state.rest = ex.rest;
+    if (!raw) {
+      const list = state.cat === 'all' ? state.templates : state.templates.filter((t) => catOf(t) === state.cat);
+      return [...list].sort((a, b) => byCat(catOf(a), catOf(b)) || a.title.localeCompare(b.title, 'ru')).map((t) => ({ t, rank: 9 }));
+    }
+    const nq = norm(raw).replace(/\s+/g, ' ');
+    const nr = norm(ex.rest).replace(/\s+/g, ' ');
+    const keys = Object.keys(ex.values);
     const out = [];
-    for (const t of list) {
-      const k = norm(t.keyword);
-      const ti = norm(t.title);
-      const b = norm(t.body);
-      let rank = null;
-      if (k === nq) rank = 0;
-      else if (k.includes(nq)) rank = 1;
-      else if (ti.includes(nq)) rank = 2;
-      else if (b.includes(nq)) rank = 3;
-      else if (terms.length > 1 && terms.every((w) => k.includes(w) || ti.includes(w) || b.includes(w))) rank = 4;
-      if (rank !== null) out.push({ t, rank });
+    for (const t of state.templates) {
+      let r = rankOne(t, nq);
+      if (nr && nr !== nq) { const r2 = rankOne(t, nr); if (r2 !== null && (r === null || r2 < r)) r = r2; }
+      if (r === null) continue;
+      if (keys.length && F.placeholders(t.body + ' ' + (t.body_kz || '')).some((k) => keys.includes(k))) r -= 0.5;
+      out.push({ t, rank: r });
     }
     return out.sort((a, b) => a.rank - b.rank || a.t.title.localeCompare(b.t.title, 'ru'));
+  }
+
+  // Какое ключевое слово показать на карточке: то, что совпало с поиском, иначе первое.
+  function shownKeyword(t) {
+    const list = kwRaw(t);
+    const nq = norm(state.rest || $('#search').value.trim());
+    if (nq) {
+      const hit = list.find((k) => norm(k) === nq) || list.find((k) => norm(k).startsWith(nq)) || list.find((k) => wordHit(norm(k), nq));
+      if (hit) return hit;
+    }
+    return list[0] || '';
+  }
+
+  const tplHasKz = (t) => !!(t.body_kz && t.body_kz.trim());
+  const MARK = ['\uE010', '\uE011'];
+  function tplText(t, lang, mark) {
+    const src = lang === 'kz' && tplHasKz(t) ? t.body_kz : t.body;
+    return F.render(src, state.fill, mark);
+  }
+  const unmark = (html) => html.replace(/\uE010/g, '<span class="filled">').replace(/\uE011/g, '</span>');
+
+  function fillNote(t) {
+    const keys = F.placeholders(t.body + ' ' + (t.body_kz || ''));
+    if (!keys.length) return '';
+    const got = keys.filter((k) => state.fill[k]);
+    if (got.length) return `<span class="tpl-fill ok">✓ подставлено: ${esc(got.map((k) => F.LABELS[k]).join(', '))}</span>`;
+    return `<span class="tpl-fill">можно подставить: ${esc(keys.map((k) => F.LABELS[k]).join(', '))} — допишите в поиск</span>`;
   }
 
   function termsRegex(q) {
@@ -652,36 +751,73 @@
   }
 
   // Если совпадение глубоко в тексте — показываем кусок вокруг него.
+  // Подставленное значение важнее совпадения — показываем кусок вокруг него.
   function snippet(body, q) {
     const terms = norm(q.trim()).split(/\s+/).filter(Boolean);
-    if (!terms.length) return body;
     const nb = norm(body);
-    let idx = nb.indexOf(terms.join(' '));
+    let idx = body.indexOf(MARK[0]);
+    if (idx < 0 && !terms.length) return body;
+    if (idx < 0) idx = nb.indexOf(terms.join(' '));
     if (idx < 0) idx = Math.min(...terms.map((t) => { const i = nb.indexOf(t); return i < 0 ? Infinity : i; }));
     if (!isFinite(idx) || idx < 120) return body;
     const start = body.lastIndexOf(' ', idx - 50);
     return '…' + body.slice(start > 0 ? start + 1 : idx - 50);
   }
 
-  function renderTemplates() {
-    const q = $('#search').value;
-    const res = searchTemplates(q);
-    const re = termsRegex(q);
-    $('#tab-count').textContent = state.templates.length || '';
-    $('#tpl-count').textContent = q.trim() ? `нашлось: ${res.length}` : `всего: ${state.templates.length}`;
-    $('#tpl-list').innerHTML = res.map(({ t }, i) => `
+  function renderChips(searching) {
+    const counts = new Map();
+    state.templates.forEach((t) => counts.set(catOf(t), (counts.get(catOf(t)) || 0) + 1));
+    const cats = [...counts.keys()].sort(byCat);
+    if (state.cat !== 'all' && !counts.has(state.cat)) state.cat = 'all';
+    const box = $('#cat-chips');
+    box.hidden = !state.templates.length;
+    box.classList.toggle('searching', searching);
+    box.innerHTML = [['all', 'Все', state.templates.length], ...cats.map((c) => [c, c, counts.get(c)])]
+      .map(([id, label, n]) => `<button class="chip${state.cat === id ? ' active' : ''}" type="button" data-cat="${esc(id)}">${esc(label)}<span>${n}</span></button>`)
+      .join('');
+  }
+
+  function cardHtml(t, i, q, re) {
+    const text = tplText(t, state.lang, MARK);
+    return `
       <article class="tpl" tabindex="0" data-id="${esc(t.id)}" style="--i:${i}">
         <div class="tpl-top">
-          <span class="kw">${hl(t.keyword, re)}</span>
+          <span class="kw">${hl(shownKeyword(t), re)}</span>
           <h3>${hl(t.title, re)}</h3>
+          ${tplHasKz(t) ? '<span class="kz-badge" title="Есть текст на казахском">ҚАЗ</span>' : ''}
           ${t.link ? '<svg class="tpl-link-dot" aria-label="есть ссылка"><use href="#i-link"/></svg>' : ''}
         </div>
-        <p class="tpl-text">${hl(snippet(t.body, q), re)}</p>
+        <p class="tpl-text">${unmark(hl(snippet(text, q), re))}</p>
+        ${fillNote(t)}
         <div class="tpl-foot">
           <span class="tpl-hint">клик — копия · два — детали</span>
           <button class="tpl-more" type="button">Детали <span aria-hidden="true">→</span></button>
         </div>
-      </article>`).join('');
+      </article>`;
+  }
+
+  function renderTemplates() {
+    const q = $('#search').value;
+    const searching = !!q.trim();
+    const res = searchTemplates(q);
+    const re = termsRegex(searching ? (state.rest || q) : '');
+    const hq = searching ? (state.rest || q) : '';
+    renderChips(searching);
+    $$('#lang-seg .seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.lang === state.lang));
+    $('#tab-count').textContent = state.templates.length || '';
+    $('#tpl-count').textContent = searching ? `нашлось: ${res.length}` : state.cat === 'all' ? `всего: ${state.templates.length}` : `в теме: ${res.length}`;
+    let html = '';
+    if (!searching && state.cat === 'all') {
+      let cur = null;
+      res.forEach(({ t }, i) => {
+        const c = catOf(t);
+        if (c !== cur) { cur = c; html += `<h3 class="tpl-group" style="--i:${i}">${esc(c)}</h3>`; }
+        html += cardHtml(t, i, hq, re);
+      });
+    } else {
+      html = res.map(({ t }, i) => cardHtml(t, i, hq, re)).join('');
+    }
+    $('#tpl-list').innerHTML = html;
     const empty = $('#tpl-empty');
     if (!res.length) {
       empty.hidden = false;
@@ -695,10 +831,12 @@
 
   const findTpl = (id) => state.templates.find((t) => String(t.id) === String(id));
 
-  async function copyTemplate(t, x, y, card) {
+  async function copyTemplate(t, x, y, card, lang) {
     if (!t) return;
-    if (await copyText(t.body)) {
+    lang = lang || state.lang;
+    if (await copyText(tplText(t, lang))) {
       bubble(x, y);
+      if (lang === 'kz' && !tplHasKz(t)) toast('Казахского текста у этого шаблона нет — скопирован русский', 'warn');
       if (card) {
         card.classList.add('copied');
         setTimeout(() => card.classList.remove('copied'), 900);
@@ -722,6 +860,22 @@
         }
       }
       if (ev.key === 'Escape') { ev.target.value = ''; renderTemplates(); }
+    });
+
+    $('#cat-chips').addEventListener('click', (ev) => {
+      const b = ev.target.closest('.chip');
+      if (!b) return;
+      state.cat = b.dataset.cat;
+      store.set('cat', state.cat);
+      if ($('#search').value.trim()) $('#search').value = '';
+      renderTemplates();
+    });
+    $('#lang-seg').addEventListener('click', (ev) => {
+      const b = ev.target.closest('.seg-btn');
+      if (!b) return;
+      state.lang = b.dataset.lang;
+      store.set('lang', state.lang);
+      renderTemplates();
     });
 
     const list = $('#tpl-list');
@@ -761,10 +915,12 @@
 
     $('#btn-add-tpl').addEventListener('click', () => openTplForm(null));
 
-    $('#d-copy').addEventListener('click', (ev) => {
+    const drawerCopy = (btn, lang) => {
       const t = findTpl(state.openTemplateId);
-      if (t) copyText(t.body).then((ok) => { if (ok) { pulse(ev.currentTarget || $('#d-copy')); bubbleOver($('#d-copy')); } });
-    });
+      if (t) copyText(tplText(t, lang)).then((ok) => { if (ok) { pulse(btn); bubbleOver(btn); } });
+    };
+    $('#d-copy').addEventListener('click', () => drawerCopy($('#d-copy'), 'ru'));
+    $('#d-copy-kz').addEventListener('click', () => drawerCopy($('#d-copy-kz'), 'kz'));
     $('#d-edit').addEventListener('click', () => {
       const t = findTpl(state.openTemplateId);
       closeLayer($('#drawer'));
@@ -773,7 +929,7 @@
     $('#d-delete').addEventListener('click', async () => {
       const t = findTpl(state.openTemplateId);
       if (!t) return;
-      const ok = await confirmBox('Удалить шаблон?', `«${t.title}» (${t.keyword}) исчезнет у всех. Вернуть его можно будет только вручную.`, 'Удалить');
+      const ok = await confirmBox('Удалить шаблон?', `«${t.title}» (${kwRaw(t)[0] || ''}) исчезнет у всех. Вернуть его можно будет только вручную.`, 'Удалить');
       if (!ok) return;
       try {
         await api.deleteTemplate(state.session && state.session.token, t.id);
@@ -795,12 +951,14 @@
         id: f.dataset.id ? Number(f.dataset.id) || f.dataset.id : null,
         keyword: f.elements.keyword.value.trim(),
         title: f.elements.title.value.trim(),
+        category: f.elements.category.value.trim(),
         body: f.elements.body.value.trim(),
+        body_kz: f.elements.body_kz.value.trim(),
         link: f.elements.link.value.trim(),
       };
       const msg = $('#tpl-form-msg');
       msg.textContent = '';
-      if (!data.keyword || !data.title || !data.body) { msg.textContent = 'Ключевое слово, название и текст обязательны.'; return; }
+      if (!data.keyword || !data.title || !data.body) { msg.textContent = 'Ключевые слова, название и текст обязательны.'; return; }
       if (data.link && !/^https?:\/\//i.test(data.link)) data.link = 'https://' + data.link;
       const btn = $('button[type=submit]', f);
       btn.disabled = true;
@@ -823,9 +981,16 @@
     const t = findTpl(id);
     if (!t) return;
     state.openTemplateId = t.id;
-    $('#d-keyword').textContent = t.keyword;
+    $('#d-cat').textContent = catOf(t);
+    $('#d-keyword').textContent = kwRaw(t).join(' · ');
     $('#d-title').textContent = t.title;
-    $('#d-body').textContent = t.body;
+    $('#d-body').innerHTML = unmark(esc(tplText(t, 'ru', MARK)));
+    const kz = tplHasKz(t);
+    $('#d-kz-wrap').hidden = !kz;
+    $('#d-copy-kz').hidden = !kz;
+    $('#d-copy-label').textContent = kz ? 'Копировать РУС' : 'Копировать';
+    if (kz) $('#d-body-kz').innerHTML = unmark(esc(tplText(t, 'kz', MARK)));
+    $('#d-fill').innerHTML = fillNote(t);
     const link = $('#d-link');
     if (t.link && /^https?:\/\//i.test(t.link)) {
       link.hidden = false;
@@ -847,11 +1012,17 @@
     f.dataset.id = t ? t.id : '';
     $('#tpl-form-title').textContent = t ? 'Редактировать шаблон' : 'Новый шаблон';
     $('#tpl-form-msg').textContent = '';
+    const cats = [...new Set([...CAT_ORDER, ...state.templates.map((x) => x.category).filter(Boolean)])];
+    $('#cat-list').innerHTML = cats.map((c) => `<option value="${esc(c)}">`).join('');
     if (t) {
       f.elements.keyword.value = t.keyword;
       f.elements.title.value = t.title;
+      f.elements.category.value = t.category || '';
       f.elements.body.value = t.body;
+      f.elements.body_kz.value = t.body_kz || '';
       f.elements.link.value = t.link || '';
+    } else if (state.cat !== 'all') {
+      f.elements.category.value = state.cat === NO_CAT ? '' : state.cat;
     }
     openLayer($('#tpl-modal'));
     setTimeout(() => f.elements.keyword.focus(), 50);
@@ -953,7 +1124,7 @@
     });
   }
 
-  // JSON-массив или блоки «ключ: … / название: … / ссылка: … / текст: …», разделённые строкой ===.
+  // JSON-массив или блоки «ключ: / название: / тема: / ссылка: / текст: / текст каз:», разделённые строкой ===.
   function parseImport(raw) {
     const items = [];
     const errors = [];
@@ -965,9 +1136,11 @@
         const arr = JSON.parse(src);
         arr.forEach((o, i) => {
           const t = {
-            keyword: pick(o, ['keyword', 'ключ', 'key']),
+            keyword: pick(o, ['keyword', 'keywords', 'ключ', 'key']),
             title: pick(o, ['title', 'название', 'name']),
+            category: pick(o, ['category', 'тема', 'раздел']),
             body: pick(o, ['body', 'text', 'текст']),
+            body_kz: pick(o, ['body_kz', 'kz', 'текст_каз', 'каз']),
             link: pick(o, ['link', 'url', 'ссылка']),
           };
           if (t.keyword && t.title && t.body) items.push(t); else errors.push(`№${i + 1}: не хватает полей`);
@@ -977,21 +1150,27 @@
     }
     src.split(/^\s*={3,}\s*$/m).forEach((block, i) => {
       if (!block.trim()) return;
-      const t = { keyword: '', title: '', body: '', link: '' };
+      const t = { keyword: '', title: '', category: '', body: '', body_kz: '', link: '' };
       const lines = block.replace(/\r/g, '').split('\n');
-      let inBody = false;
-      const bodyLines = [];
+      let where = null; // null | 'ru' | 'kz'
+      const ru = [];
+      const kz = [];
       for (const line of lines) {
-        if (inBody) { bodyLines.push(line); continue; }
-        const m = line.match(/^\s*(ключ(?:евое слово)?|название|ссылка|текст)\s*:\s*(.*)$/i);
-        if (!m) { if (line.trim()) bodyLines.push(line); continue; }
+        const kzm = line.match(/^\s*(?:текст\s*)?(?:каз|қаз|kz)\s*:\s*(.*)$/i);
+        if (kzm) { where = 'kz'; if (kzm[1].trim()) kz.push(kzm[1]); continue; }
+        if (where === 'kz') { kz.push(line); continue; }
+        if (where === 'ru') { ru.push(line); continue; }
+        const m = line.match(/^\s*(ключ(?:евые слова|евое слово|и)?|название|тема|раздел|ссылка|текст)\s*:\s*(.*)$/i);
+        if (!m) { if (line.trim()) ru.push(line); continue; }
         const key = m[1].toLowerCase();
         if (key.startsWith('ключ')) t.keyword = m[2].trim();
         else if (key === 'название') t.title = m[2].trim();
+        else if (key === 'тема' || key === 'раздел') t.category = m[2].trim();
         else if (key === 'ссылка') t.link = m[2].trim();
-        else { inBody = true; if (m[2].trim()) bodyLines.push(m[2]); }
+        else { where = 'ru'; if (m[2].trim()) ru.push(m[2]); }
       }
-      t.body = bodyLines.join('\n').trim();
+      t.body = ru.join('\n').trim();
+      t.body_kz = kz.join('\n').trim();
       if (t.keyword && t.title && t.body) items.push(t);
       else errors.push(`блок ${i + 1}: ${!t.keyword ? 'нет ключа' : !t.title ? 'нет названия' : 'нет текста'}`);
     });

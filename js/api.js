@@ -55,7 +55,7 @@
 
     return {
       mode: 'supabase',
-      listTemplates: () => listAll('templates', 'id,keyword,title,body,link', 'id.asc'),
+      listTemplates: () => listAll('templates', 'id,keyword,title,category,body,body_kz,link', 'id.asc'),
       listShortcuts: async () => (await listAll('shortcuts', 'id,kind,short,full_text', 'id.asc'))
         .map((r) => ({ id: r.id, kind: r.kind, short: r.short, full: r.full_text })),
       login: (code, device) => rpc('login', { p_code: code, p_device: device }),
@@ -63,6 +63,7 @@
       status: (token) => rpc('session_status', { p_token: token }),
       saveTemplate: (token, t) => rpc('template_save', {
         p_token: token, p_id: t.id || null, p_keyword: t.keyword, p_title: t.title, p_body: t.body, p_link: t.link || null,
+        p_category: t.category || null, p_body_kz: t.body_kz || null,
       }),
       deleteTemplate: (token, id) => rpc('template_delete', { p_token: token, p_id: id }),
       importTemplates: (token, items, replace) => rpc('templates_import', { p_token: token, p_items: items, p_replace: !!replace }),

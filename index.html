@@ -137,6 +137,13 @@
             </div>
           </div>
         </div>
+        <div class="tones" id="tones" hidden>
+          <div class="tones-head">
+            <h2>Другим тоном</h2>
+            <span class="pane-hint">клик — скопировать</span>
+          </div>
+          <div class="tones-list" id="tones-list"></div>
+        </div>
         <p class="honest">Я корректор на правилах, а не нейросеть: дописываю обрывки слов, чиню опечатки, ставлю заглавные, точки и частые запятые. Причастные обороты и сложные предложения — пока ваше.</p>
       </section>
 
@@ -148,10 +155,15 @@
             <input id="search" type="search" placeholder="Ключевое слово, название или кусок текста" autocomplete="off" spellcheck="false">
             <kbd class="search-kbd" title="Enter копирует первый результат">Enter</kbd>
           </label>
+          <div class="seg lang-seg" id="lang-seg" role="group" aria-label="Язык копирования">
+            <button class="seg-btn" data-lang="ru" type="button" title="Копировать на русском">РУС</button>
+            <button class="seg-btn" data-lang="kz" type="button" title="Копировать на казахском (если есть)">ҚАЗ</button>
+          </div>
           <span class="tpl-count" id="tpl-count"></span>
           <button class="btn btn-green" id="btn-add-tpl" type="button" hidden>+ Добавить шаблон</button>
         </div>
-        <p class="tpl-help">Клик — скопировать. Двойной клик или «Детали» — открыть целиком.</p>
+        <div class="cat-chips" id="cat-chips" hidden></div>
+        <p class="tpl-help">Клик — скопировать. Двойной клик или «Детали» — открыть целиком. Номер, сумму, карту или банк можно дописать прямо в поиск: <i>идентиф +7 706 000 0000</i>, <i>пт бцк</i>, <i>вал поступил 5000</i> — они встанут в текст.</p>
         <div class="tpl-list" id="tpl-list"></div>
         <div class="empty" id="tpl-empty" hidden></div>
       </section>
@@ -175,12 +187,15 @@
           <div class="card">
             <div class="card-head"><h2>Импорт шаблонов</h2></div>
             <p class="muted small">Вставьте JSON-массив или текст в формате ниже, либо выберите файл. Блоки разделяются строкой <code>===</code>.</p>
-            <pre class="import-example">ключ: возз
+            <pre class="import-example">ключ: возз, возврат
 название: Возврат средств
-ссылка: https://…   (необязательно)
+тема: Кредиты          (необязательно)
+ссылка: https://…      (необязательно)
 текст:
 Полный текст ответа клиенту,
 можно в несколько строк.
+текст каз:             (необязательно)
+Қазақша мәтін.
 ===
 ключ: …</pre>
             <textarea id="import-text" class="field import-field" spellcheck="false" placeholder="Вставьте шаблоны сюда"></textarea>
@@ -210,12 +225,19 @@
     <div class="scrim" data-close></div>
     <aside class="drawer" role="dialog" aria-modal="true" aria-labelledby="d-title">
       <button class="icon-btn drawer-close" data-close type="button" aria-label="Закрыть"><svg><use href="#i-close"/></svg></button>
-      <span class="kw" id="d-keyword"></span>
+      <span class="d-cat" id="d-cat"></span>
       <h2 id="d-title"></h2>
+      <p class="d-keys"><span>Ключи:</span> <span id="d-keyword"></span></p>
       <div class="d-body" id="d-body"></div>
+      <div class="d-kz" id="d-kz-wrap" hidden>
+        <h4>Қазақша</h4>
+        <div class="d-body" id="d-body-kz"></div>
+      </div>
+      <div id="d-fill"></div>
       <a class="d-link" id="d-link" target="_blank" rel="noopener noreferrer" hidden><svg class="ico"><use href="#i-link"/></svg><span></span></a>
       <div class="d-actions">
-        <button class="btn btn-copy" id="d-copy" type="button"><svg class="ico"><use href="#i-copy"/></svg>Копировать</button>
+        <button class="btn btn-copy" id="d-copy" type="button"><svg class="ico"><use href="#i-copy"/></svg><span id="d-copy-label">Копировать</span></button>
+        <button class="btn btn-copy" id="d-copy-kz" type="button" hidden><svg class="ico"><use href="#i-copy"/></svg>Копировать ҚАЗ</button>
         <span class="spacer"></span>
         <button class="btn btn-green" id="d-edit" type="button" data-admin hidden>Редактировать</button>
         <button class="btn danger" id="d-delete" type="button" data-admin hidden>Удалить</button>
@@ -230,10 +252,13 @@
       <button class="icon-btn modal-close" data-close type="button" aria-label="Закрыть"><svg><use href="#i-close"/></svg></button>
       <h2 id="tpl-form-title">Новый шаблон</h2>
       <div class="form-row two">
-        <label>Ключевое слово <b>*</b><input name="keyword" maxlength="60" required placeholder="возз"></label>
+        <label>Ключевые слова <b>*</b><input name="keyword" maxlength="300" required placeholder="возз, возврат"></label>
         <label>Название <b>*</b><input name="title" maxlength="200" required placeholder="Возврат средств"></label>
       </div>
-      <label>Текст <b>*</b><textarea name="body" rows="8" maxlength="10000" required placeholder="Полный текст ответа клиенту"></textarea></label>
+      <label>Тема<input name="category" maxlength="60" list="cat-list" placeholder="Кредиты, Контакты, Переводы…"><datalist id="cat-list"></datalist></label>
+      <label>Текст на русском <b>*</b><textarea name="body" rows="7" maxlength="10000" required placeholder="Полный текст ответа клиенту"></textarea></label>
+      <p class="muted small form-tip">Можно оставить место для подстановки из поиска: <code>{телефон}</code> <code>{сумма}</code> <code>{карта}</code> <code>{ICCID}</code> <code>{дата}</code> <code>{модель}</code> <code>{банк}</code>. Кусок в <code>[[ ]]</code> пропадёт, если значение не дописали в поиск: <code>нет доступа к номеру[[ {телефон}]], мы…</code></p>
+      <label>Текст на казахском<textarea name="body_kz" rows="5" maxlength="10000" placeholder="Необязательно"></textarea></label>
       <label>Ссылка<input name="link" maxlength="1000" placeholder="https://… — инструкция или страница банка"></label>
       <p class="form-msg" id="tpl-form-msg" role="alert"></p>
       <div class="modal-actions">
@@ -284,6 +309,8 @@
   <script src="js/vocab.js"></script>
   <script src="js/speller.js"></script>
   <script src="js/corrector.js"></script>
+  <script src="js/tones.js"></script>
+  <script src="js/fill.js"></script>
   <script src="js/api.js"></script>
   <script src="js/mock-backend.js"></script>
   <script src="js/app.js"></script>
