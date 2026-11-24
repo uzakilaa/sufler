@@ -1,2 +1,3 @@
-# Template base files contain internal bank data: never commit them
+.claude/
+# Выгрузки шаблонов могут содержать внутреннюю информацию банка: в репозиторий не кладём
 *.json
