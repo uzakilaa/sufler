@@ -425,13 +425,29 @@
 
   let lastResult = '';
 
-  function renderResult() {
+  // Подсказки и варианты тона ниже обновляются не на каждую букву, а когда оператор
+  // перестал печатать на 3 секунды. Пока ждём — старые блоки чуть приглушены.
+  const BELOW_DELAY = 3000;
+  let belowTimer = 0;
+  function renderBelow(draft, out, wait) {
+    clearTimeout(belowTimer);
+    const blocks = [$('#suggest'), $('#tones')];
+    const run = () => {
+      blocks.forEach((b) => b.classList.remove('waiting'));
+      renderTones(out);
+      renderSuggest(draft, out);
+    };
+    if (!wait || !out) { run(); return; }
+    blocks.forEach((b) => b.classList.add('waiting'));
+    belowTimer = setTimeout(run, BELOW_DELAY);
+  }
+
+  function renderResult(wait) {
     const draft = $('#draft').value;
     const out = corrector.correct(draft);
     lastResult = out;
     const box = $('#result');
-    renderTones(out);
-    renderSuggest(draft, out);
+    renderBelow(draft, out, wait);
     if (!out) {
       box.innerHTML = '<span class="placeholder">Тут появится текст, который не стыдно отправить клиенту.</span>';
       $('#changes-hint').textContent = '';
@@ -570,7 +586,7 @@
     let raf = 0;
     draft.addEventListener('input', () => {
       cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => { renderResult(); store.set('draft', draft.value); });
+      raf = requestAnimationFrame(() => { renderResult(true); store.set('draft', draft.value); });
     });
     $('#btn-copy').addEventListener('click', () => copyResult(false));
     $('#btn-clear').addEventListener('click', () => { draft.value = ''; store.del('draft'); renderResult(); draft.focus(); });
@@ -907,7 +923,7 @@
   }
 
   function renderTemplates() {
-    if (state.templates.length) { renderFlow(); renderSuggest($('#draft').value, lastResult || ''); }
+    if (state.templates.length) { renderFlow(); if (!belowTimer || !$('#suggest').classList.contains('waiting')) renderSuggest($('#draft').value, lastResult || ''); }
     const q = $('#search').value;
     const searching = !!q.trim();
     const res = searchTemplates(q);

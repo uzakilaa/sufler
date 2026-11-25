@@ -247,13 +247,13 @@ kbd {
 .pane-head h2 { font-size: 15px; font-weight: 800; }
 .pane-hint { font-size: 12.5px; color: var(--muted); }
 .field {
-  width: 100%; min-height: 340px; flex: 1; resize: vertical; border: 1px solid var(--line); border-radius: 14px;
+  width: 100%; min-height: 190px; height: 190px; flex: 1; resize: vertical; border: 1px solid var(--line); border-radius: 14px;
   background: rgba(255, 255, 255, .55); padding: 14px 16px; font-size: 16px; line-height: 1.65; outline: none;
   transition: border-color .2s, box-shadow .2s, background .2s;
 }
 .field:focus { border-color: var(--sage); box-shadow: 0 0 0 4px rgba(173, 188, 159, .28); background: rgba(255, 255, 255, .8); }
 .field::placeholder, .search input::placeholder, .modal input::placeholder, .modal textarea::placeholder, .dict-filter::placeholder { color: var(--muted); opacity: .55; font-style: italic; }
-.result { white-space: pre-wrap; word-wrap: break-word; overflow: auto; resize: none; max-height: 60vh; }
+.result { white-space: pre-wrap; word-wrap: break-word; overflow: auto; resize: none; max-height: 45vh; }
 .result .placeholder { color: var(--muted); opacity: .75; font-style: italic; }
 .result .chg {
   background: linear-gradient(to top, rgba(158, 103, 82, .22) 0 34%, transparent 34%);
@@ -633,3 +633,7 @@ html { scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: rgba(67
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(67, 104, 80, .35); border-radius: 10px; border: 3px solid transparent; background-clip: padding-box; }
 ::-webkit-scrollbar-thumb:hover { background-color: rgba(67, 104, 80, .6); }
+
+/* Блоки под корректором ждут паузы в наборе */
+.suggest, .tones { transition: opacity .3s; }
+.suggest.waiting, .tones.waiting { opacity: .5; }
