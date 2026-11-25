@@ -48,6 +48,10 @@
     db.announcements = db.announcements || [];
     db.suggestions = db.suggestions || [];
     db.journal = db.journal || [];
+    db.topics = db.topics || [];
+    db.links = db.links || [
+      { id: 1, title: 'Пример: база знаний', url: 'https://example.com/kb', note: 'демо-ссылка', sort: 1 },
+    ];
     return db;
   }
   function save(db) { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { /* приватный режим */ } }
@@ -75,7 +79,40 @@
     return {
       mode: 'demo',
       demoCodes: DEMO_CODES.map((c) => ({ code: c.code, role: c.role })),
-      listTemplates: () => run((db) => clone(db.templates)),
+      listTemplates: () => run((db) => clone(db.templates.map(({ image, ...t }) => ({ ...t, has_image: !!image })))),
+      templateImage: (id) => run((db) => { const t = db.templates.find((x) => String(x.id) === String(id)); return t ? t.image || null : null; }),
+      listTopics: () => run((db) => clone(db.topics.slice().sort((x, y) => x.localeCompare(y, 'ru')))),
+      topicAdd: (token, name) => run((db) => {
+        const s = auth(db, token, 'admin');
+        const v = String(name || '').replace(/\s+/g, ' ').trim();
+        if (!v || v.length > 60) throw err('VALIDATION');
+        if (!db.topics.includes(v)) { db.topics.push(v); log(db, actor(s), 'Тема добавлена', v); }
+        return { ok: true, name: v };
+      }),
+      topicDelete: (token, name) => run((db) => {
+        const s = auth(db, token, 'admin');
+        if (db.templates.some((t) => t.category === name)) throw err('VALIDATION');
+        db.topics = db.topics.filter((x) => x !== name);
+        log(db, actor(s), 'Тема удалена', name);
+        return { ok: true };
+      }),
+      listLinks: () => run((db) => clone(db.links.slice().sort((x, y) => x.sort - y.sort || x.id - y.id))),
+      linkSave: (token, l) => run((db) => {
+        const s = auth(db, token, 'admin');
+        if (!String(l.title || '').trim() || !/^https?:\/\//i.test(l.url || '')) throw err('VALIDATION');
+        const f = { title: l.title.trim().slice(0, 80), url: l.url.trim(), note: (l.note || '').trim() || null, sort: l.sort == null ? 100 : l.sort };
+        let row = l.id && db.links.find((x) => x.id === l.id);
+        if (row) { Object.assign(row, f); log(db, actor(s), 'Программа изменена', row.title); }
+        else { row = { id: ++db.seq, ...f }; db.links.push(row); log(db, actor(s), 'Программа добавлена', row.title); }
+        return clone(row);
+      }),
+      linkDelete: (token, id) => run((db) => {
+        const s = auth(db, token, 'admin');
+        const l = db.links.find((x) => x.id === id);
+        db.links = db.links.filter((x) => x.id !== id);
+        if (l) log(db, actor(s), 'Программа удалена', l.title);
+        return { ok: true };
+      }),
       listShortcuts: () => run((db) => clone(db.shortcuts)),
       login: (code, device) => run((db) => {
         const key = device || 'none';
@@ -114,16 +151,18 @@
       saveTemplate: (token, t) => run((db) => {
         auth(db, token, 'admin');
         if (!t.keyword.trim() || !t.title.trim() || !t.body.trim()) throw err('VALIDATION');
-        const row = { keyword: t.keyword.trim(), title: t.title.trim(), category: (t.category || '').trim() || null, body: t.body.trim(), body_kz: (t.body_kz || '').trim() || null, link: (t.link || '').trim() || null };
+        const row = { keyword: t.keyword.trim(), title: t.title.trim(), category: (t.category || '').trim() || null, body: t.body.trim(), body_kz: (t.body_kz || '').trim() || null, link: (t.link || '').trim() || null, notice: (t.notice || '').trim() || null };
+        if (t.image !== undefined && t.image !== null) row.image = t.image || null;
+        const out = (x) => { const { image, ...rest } = clone(x); return { ...rest, has_image: !!image }; };
         if (t.id) {
           const ex = db.templates.find((x) => x.id === t.id);
           if (!ex) throw err('NOT_FOUND');
           Object.assign(ex, row);
-          return clone(ex);
+          return out(ex);
         }
         const n = { id: ++db.seq, ...row };
         db.templates.push(n);
-        return clone(n);
+        return out(n);
       }),
       deleteTemplate: (token, id) => run((db) => {
         auth(db, token, 'admin');
@@ -136,7 +175,7 @@
         let inserted = 0;
         for (const x of items) {
           if (!x.keyword || !x.title || !x.body) continue;
-          db.templates.push({ id: ++db.seq, keyword: x.keyword.trim(), title: x.title.trim(), category: (x.category || '').trim() || null, body: x.body.trim(), body_kz: (x.body_kz || '').trim() || null, link: (x.link || '').trim() || null });
+          db.templates.push({ id: ++db.seq, keyword: x.keyword.trim(), title: x.title.trim(), category: (x.category || '').trim() || null, body: x.body.trim(), body_kz: (x.body_kz || '').trim() || null, link: (x.link || '').trim() || null, notice: (x.notice || '').trim() || null });
           inserted++;
         }
         return { inserted };

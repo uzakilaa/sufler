@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=13">
+  <link rel="stylesheet" href="css/style.css?v=14">
 </head>
 <body>
   <!-- Фон рисуется кодом: пятна плывут, поверх лёгкое зерно -->
@@ -48,6 +48,11 @@
     <symbol id="i-loop" viewBox="0 0 24 24"><path d="M19 8a7.5 7.5 0 0 0-13.5 1M5 16a7.5 7.5 0 0 0 13.5-1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M19 3.5V8h-4.5M5 20.5V16h4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 5 6v5.5c0 4.5 3 8 7 9.5 4-1.5 7-5 7-9.5V6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m9 12 2.2 2.2L15.5 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-megaphone" viewBox="0 0 24 24"><path d="M4 10v4a1 1 0 0 0 1 1h2l6 4V5L7 9H5a1 1 0 0 0-1 1z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3.5 2.8 19.5h18.4z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M12 9.5v4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="16.8" r="1.2" fill="currentColor"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="3" fill="none" stroke="currentColor" stroke-width="1.9"/><circle cx="9" cy="10" r="1.8" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="m5 18 5-5 3.5 3.5L16 14l3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-oops" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-coin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 7.5v9M14.6 9.6c-.5-.8-1.5-1.3-2.6-1.3-1.5 0-2.6.8-2.6 1.9 0 2.6 5.4 1.3 5.4 3.9 0 1.1-1.2 1.9-2.8 1.9-1.2 0-2.2-.5-2.7-1.3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
     <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5zM4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
   </svg>
 
@@ -116,6 +121,7 @@
       <span class="tab-ink" id="tab-ink"></span>
       <button class="tab" role="tab" data-tab="corrector" type="button">Корректор</button>
       <button class="tab" role="tab" data-tab="templates" type="button">Шаблоны <span class="tab-count" id="tab-count"></span></button>
+      <button class="tab" role="tab" data-tab="apps" type="button">Программы</button>
       <button class="tab" role="tab" data-tab="sugg" type="button" hidden>Предложения <span class="tab-count" id="sugg-count"></span></button>
       <button class="tab" role="tab" data-tab="owner" type="button" hidden>Сессии</button>
     </nav>
@@ -166,6 +172,7 @@
           <div class="flow-head">
             <h2>Быстрые фразы</h2>
             <span class="pane-hint">клик — скопировать · наведите, чтобы прочитать</span>
+            <button class="btn oops-btn" type="button" data-oops="ru" title="Скопировать: «Просим не обращать внимания на предыдущее сообщение…»"><svg class="ico"><use href="#i-oops"/></svg>Лоханулся</button>
             <label class="flow-name">Меня зовут <input id="op-name" maxlength="40" placeholder="ваше имя" autocomplete="off" spellcheck="false"></label>
           </div>
           <div class="flow-map" id="flow-map"></div>
@@ -186,6 +193,7 @@
             <button class="seg-btn" data-lang="kz" type="button" title="Копировать на казахском (если есть)">ҚАЗ</button>
           </div>
           <span class="tpl-count" id="tpl-count"></span>
+          <button class="btn oops-btn" type="button" data-oops="tpl" title="Скопировать: «Просим не обращать внимания на предыдущее сообщение…»"><svg class="ico"><use href="#i-oops"/></svg>Лоханулся</button>
           <button class="btn btn-green" id="btn-add-tpl" type="button" hidden>+ Добавить шаблон</button>
           <button class="btn ghost" id="btn-suggest" type="button">Предложить шаблон</button>
         </div>
@@ -193,6 +201,17 @@
         <p class="tpl-help">Клик — скопировать. Двойной клик или «Детали» — открыть целиком. Номер, сумму, карту или банк можно дописать прямо в поиск: <i>идентиф +7 706 000 0000</i>, <i>пт бцк</i>, <i>вал поступил 5000</i> — они встанут в текст.</p>
         <div class="tpl-list" id="tpl-list"></div>
         <div class="empty" id="tpl-empty" hidden></div>
+      </section>
+
+      <!-- ===== Программы ===== -->
+      <section class="view" id="view-apps" data-view="apps" hidden>
+        <div class="apps-bar">
+          <h2>Программы</h2>
+          <span class="pane-hint">с чем работаем · клик — открыть в новой вкладке</span>
+          <button class="btn btn-green" id="btn-add-app" type="button" data-admin hidden>+ Добавить программу</button>
+        </div>
+        <div class="apps-list" id="apps-list"></div>
+        <div class="empty" id="apps-empty" hidden></div>
       </section>
 
       <!-- ===== Предложения операторов (админ и владелец) ===== -->
@@ -281,6 +300,12 @@
         <div class="d-body" id="d-body-kz"></div>
       </div>
       <div id="d-fill"></div>
+      <div class="d-notice" id="d-notice" hidden><svg class="ico"><use href="#i-alert"/></svg><span></span></div>
+      <div class="d-shot" id="d-shot" hidden>
+        <h4>Скриншот к шаблону</h4>
+        <button class="d-shot-img" id="d-shot-view" type="button" title="Открыть крупно"><img id="d-shot-img" alt="Скриншот к шаблону"></button>
+        <button class="btn ghost" id="d-shot-copy" type="button"><svg class="ico"><use href="#i-image"/></svg>Скопировать скрин</button>
+      </div>
       <a class="d-link" id="d-link" target="_blank" rel="noopener noreferrer" hidden><svg class="ico"><use href="#i-link"/></svg><span></span></a>
       <div class="d-actions">
         <button class="btn btn-copy" id="d-copy" type="button"><svg class="ico"><use href="#i-copy"/></svg><span id="d-copy-label">Копировать</span></button>
@@ -303,11 +328,20 @@
         <label>Ключевые слова <b>*</b><input name="keyword" maxlength="300" required placeholder="возз, возврат"></label>
         <label>Название <b>*</b><input name="title" maxlength="200" required placeholder="Возврат средств"></label>
       </div>
-      <label>Тема<input name="category" maxlength="60" list="cat-list" placeholder="Кредиты, Контакты, Переводы…"><datalist id="cat-list"></datalist></label>
+      <label>Тема<input name="category" maxlength="60" list="cat-list" placeholder="Кредиты, Контакты, Переводы…"><datalist id="cat-list"></datalist><span class="field-tip">Можно вписать новую тему — она появится в списке тем.</span></label>
       <label>Текст на русском <b>*</b><textarea name="body" rows="7" maxlength="10000" required placeholder="Полный текст ответа клиенту"></textarea></label>
-      <p class="muted small form-tip">Можно оставить место для подстановки из поиска: <code>{телефон}</code> <code>{сумма}</code> <code>{карта}</code> <code>{ICCID}</code> <code>{дата}</code> <code>{модель}</code> <code>{банк}</code>. Кусок в <code>[[ ]]</code> пропадёт, если значение не дописали в поиск: <code>нет доступа к номеру[[ {телефон}]], мы…</code></p>
+      <p class="muted small form-tip">Можно оставить место для подстановки из поиска: <code>{телефон}</code> <code>{сумма}</code> <code>{карта}</code> <code>{ICCID}</code> <code>{дата}</code> <code>{модель}</code> <code>{банк}</code> <code>{MCC}</code> <code>{мерчант}</code> <code>{ЧСИ}</code>. Кусок в <code>[[ ]]</code> пропадёт, если значение не дописали в поиск: <code>нет доступа к номеру[[ {телефон}]], мы…</code></p>
       <label>Текст на казахском<textarea name="body_kz" rows="5" maxlength="10000" placeholder="Необязательно"></textarea></label>
       <label>Ссылка<input name="link" maxlength="1000" placeholder="https://… — инструкция или страница банка"></label>
+      <label>Предупреждение при копировании<textarea name="notice" rows="2" maxlength="1000" placeholder="Необязательно. Например: «Текст составлен под конкретного клиента — проверьте перед отправкой»"></textarea></label>
+      <div class="img-field">
+        <span class="img-field-label">Скриншот к шаблону <span class="muted">(необязательно — при копировании операторы увидят окно «не отправлять без скрина»)</span></span>
+        <div class="img-drop" id="tpl-img-drop" tabindex="0">
+          <img id="tpl-img-preview" alt="Скриншот к шаблону" hidden>
+          <span class="img-drop-hint" id="tpl-img-hint"><svg class="ico"><use href="#i-image"/></svg>Вставьте картинку (Ctrl+V), перетащите сюда или <label class="link-btn">выберите файл<input type="file" id="tpl-img-file" accept="image/png,image/jpeg,image/webp" hidden></label></span>
+        </div>
+        <button class="btn ghost" id="tpl-img-remove" type="button" hidden>Убрать скрин</button>
+      </div>
       <p class="form-msg" id="tpl-form-msg" role="alert"></p>
       <div class="modal-actions">
         <button class="btn ghost" type="button" data-close>Отмена</button>
@@ -387,6 +421,72 @@
     </div>
   </div>
 
+  <div class="modal-wrap notice-wrap" id="notice-modal" hidden>
+    <div class="scrim" data-close></div>
+    <div class="modal notice-modal" role="alertdialog" aria-modal="true" aria-labelledby="nm-title">
+      <div class="nm-badge"><svg><use href="#i-alert"/></svg></div>
+      <h2 id="nm-title">Текст скопирован</h2>
+      <p class="nm-text" id="nm-text"></p>
+      <ol class="nm-steps" id="nm-steps" hidden>
+        <li>Вставьте скопированный текст в Ч2Д.</li>
+        <li>Вернитесь сюда и нажмите <b>«Скопировать скрин»</b>.</li>
+        <li>Вставьте скрин в Ч2Д и отправьте вместе с текстом.</li>
+      </ol>
+      <button class="nm-shot" id="nm-shot" type="button" hidden title="Открыть крупно"><img id="nm-img" alt="Скриншот к шаблону"><span class="nm-loading" id="nm-loading">Загружаю скрин…</span></button>
+      <div class="modal-actions">
+        <button class="btn ghost" id="nm-view" type="button" hidden>Посмотреть скрин</button>
+        <button class="btn btn-copy" id="nm-copy-img" type="button" hidden><svg class="ico"><use href="#i-image"/></svg>Скопировать скрин</button>
+        <button class="btn btn-green" type="button" data-close id="nm-ok">Понятно</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-wrap shot-view" id="shot-view" hidden>
+    <div class="scrim" data-close></div>
+    <figure class="shot-figure">
+      <img id="sv-img" alt="Скриншот к шаблону">
+      <figcaption><button class="btn btn-copy" id="sv-copy" type="button"><svg class="ico"><use href="#i-image"/></svg>Скопировать скрин</button><button class="btn ghost" type="button" data-close>Закрыть</button></figcaption>
+    </figure>
+  </div>
+
+  <div class="modal-wrap" id="app-modal" hidden>
+    <div class="scrim" data-close></div>
+    <form class="modal modal-small" id="app-form" autocomplete="off">
+      <button class="icon-btn modal-close" data-close type="button" aria-label="Закрыть"><svg><use href="#i-close"/></svg></button>
+      <h2 id="app-form-title">Новая программа</h2>
+      <label>Название <b>*</b><input name="title" maxlength="80" required placeholder="Ч2Д (Chat2Desk)"></label>
+      <label>Ссылка <b>*</b><input name="url" maxlength="1000" required placeholder="https://…"></label>
+      <label>Подсказка<input name="note" maxlength="300" placeholder="Необязательно: для чего эта программа"></label>
+      <label>Порядок в списке<input name="sort" type="number" min="0" max="999" step="1" value="100"></label>
+      <p class="form-msg" id="app-form-msg" role="alert"></p>
+      <div class="modal-actions">
+        <button class="btn danger" id="app-delete" type="button" hidden>Удалить</button>
+        <span class="spacer"></span>
+        <button class="btn ghost" type="button" data-close>Отмена</button>
+        <button class="btn btn-green" type="submit">Сохранить</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="modal-wrap" id="topic-modal" hidden>
+    <div class="scrim" data-close></div>
+    <form class="modal modal-small" id="topic-form" autocomplete="off">
+      <button class="icon-btn modal-close" data-close type="button" aria-label="Закрыть"><svg><use href="#i-close"/></svg></button>
+      <h2>Новая тема</h2>
+      <p class="muted small">Тема сразу появится среди тем шаблонов у всех. Шаблоны в неё можно перенести через «Редактировать» → «Тема».</p>
+      <label>Название темы<input name="name" maxlength="60" required placeholder="Например: Отзывы и жалобы"></label>
+      <p class="form-msg" id="topic-form-msg" role="alert"></p>
+      <div class="modal-actions">
+        <button class="btn ghost" type="button" data-close>Закрыть</button>
+        <button class="btn btn-green" type="submit">Добавить тему</button>
+      </div>
+      <div class="topic-empty" id="topic-empty" hidden>
+        <h3>Пустые темы</h3>
+        <ul class="topic-list" id="topic-list"></ul>
+      </div>
+    </form>
+  </div>
+
   <div class="modal-wrap" id="confirm-modal" hidden>
     <div class="scrim" data-close></div>
     <div class="modal modal-small">
@@ -401,16 +501,16 @@
 
   <div class="toasts" id="toasts" aria-live="polite"></div>
 
-  <script src="js/config.js?v=13"></script>
-  <script src="js/vocab.js?v=13"></script>
-  <script src="js/words.js?v=13"></script>
-  <script src="js/speller.js?v=13"></script>
-  <script src="js/corrector.js?v=13"></script>
-  <script src="js/tones.js?v=13"></script>
-  <script src="js/fill.js?v=13"></script>
-  <script src="js/api.js?v=13"></script>
-  <script src="js/mock-backend.js?v=13"></script>
-  <script src="js/pets.js?v=13"></script>
-  <script src="js/app.js?v=13"></script>
+  <script src="js/config.js?v=14"></script>
+  <script src="js/vocab.js?v=14"></script>
+  <script src="js/words.js?v=14"></script>
+  <script src="js/speller.js?v=14"></script>
+  <script src="js/corrector.js?v=14"></script>
+  <script src="js/tones.js?v=14"></script>
+  <script src="js/fill.js?v=14"></script>
+  <script src="js/api.js?v=14"></script>
+  <script src="js/mock-backend.js?v=14"></script>
+  <script src="js/pets.js?v=14"></script>
+  <script src="js/app.js?v=14"></script>
 </body>
 </html>

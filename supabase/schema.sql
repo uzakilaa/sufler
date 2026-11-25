@@ -285,39 +285,7 @@ $$;
 
 -- ---------- Шаблоны ----------
 
-drop function if exists public.template_save(text, bigint, text, text, text, text);
-create or replace function public.template_save(
-  p_token text, p_id bigint, p_keyword text, p_title text, p_body text, p_link text default null,
-  p_category text default null, p_body_kz text default null)
-returns json
-language plpgsql security definer
-set search_path = public, extensions
-as $$
-declare
-  t public.templates;
-begin
-  perform public._auth(p_token, 'admin');
-  if coalesce(trim(p_keyword), '') = '' or coalesce(trim(p_title), '') = '' or coalesce(trim(p_body), '') = '' then
-    raise exception 'VALIDATION';
-  end if;
-  if p_id is null then
-    insert into public.templates (keyword, title, category, body, body_kz, link)
-    values (trim(p_keyword), trim(p_title), nullif(trim(coalesce(p_category, '')), ''), trim(p_body),
-            nullif(trim(coalesce(p_body_kz, '')), ''), nullif(trim(coalesce(p_link, '')), ''))
-    returning * into t;
-  else
-    update public.templates
-       set keyword = trim(p_keyword), title = trim(p_title), body = trim(p_body),
-           category = nullif(trim(coalesce(p_category, '')), ''),
-           body_kz = nullif(trim(coalesce(p_body_kz, '')), ''),
-           link = nullif(trim(coalesce(p_link, '')), ''), updated_at = now()
-     where id = p_id
-    returning * into t;
-    if not found then raise exception 'NOT_FOUND'; end if;
-  end if;
-  return row_to_json(t);
-end;
-$$;
+-- template_save — ниже, в блоке «Предупреждение и скриншот у шаблона» (ему нужен журнал).
 
 create or replace function public.template_delete(p_token text, p_id bigint)
 returns json
@@ -348,12 +316,13 @@ begin
   if p_replace then
     delete from public.templates where id is not null;
   end if;
-  insert into public.templates (keyword, title, category, body, body_kz, link)
+  insert into public.templates (keyword, title, category, body, body_kz, link, notice)
   select left(trim(x ->> 'keyword'), 300), left(trim(x ->> 'title'), 200),
          nullif(left(trim(coalesce(x ->> 'category', '')), 60), ''),
          left(trim(x ->> 'body'), 10000),
          nullif(left(trim(coalesce(x ->> 'body_kz', '')), 10000), ''),
-         nullif(trim(coalesce(x ->> 'link', '')), '')
+         nullif(trim(coalesce(x ->> 'link', '')), ''),
+         nullif(left(trim(coalesce(x ->> 'notice', '')), 1000), '')
     from jsonb_array_elements(p_items) as x
    where coalesce(trim(x ->> 'keyword'), '') <> ''
      and coalesce(trim(x ->> 'title'), '') <> ''
@@ -697,7 +666,7 @@ begin
   perform public._log(case when p_accept then 'Предложение принято' else 'Предложение отклонено' end,
     coalesce(t.title, sg.title, (select title from public.templates where id = sg.template_id), '') ||
     ' · от ' || coalesce(nullif(sg.author, ''), 'оператора'));
-  return json_build_object('ok', true, 'template', case when t.id is null then null else row_to_json(t) end);
+  return json_build_object('ok', true, 'template', case when t.id is null then null else (to_jsonb(t) - 'image')::json end);
 end;
 $$;
 
@@ -716,6 +685,168 @@ begin
 end;
 $$;
 
+-- ---------- Предупреждение и скриншот у шаблона, темы, «Программы» ----------
+
+-- notice — окно-предупреждение при копировании («проверь перед отправкой»);
+-- image  — скриншот к шаблону (data:image/…;base64), грузится отдельно, только когда нужен.
+alter table public.templates add column if not exists notice text;
+alter table public.templates add column if not exists image  text;
+alter table public.templates add column if not exists has_image boolean generated always as (image is not null) stored;
+alter table public.templates drop constraint if exists templates_notice_len;
+alter table public.templates add constraint templates_notice_len check (notice is null or length(notice) <= 1000);
+alter table public.templates drop constraint if exists templates_image_fmt;
+alter table public.templates add constraint templates_image_fmt
+  check (image is null or (image ~ '^data:image/(png|jpeg|webp);base64,' and length(image) <= 3000000));
+
+drop function if exists public.template_save(text, bigint, text, text, text, text);
+drop function if exists public.template_save(text, bigint, text, text, text, text, text, text);
+-- p_image: null — не трогать скрин, '' — убрать, data:image/… — заменить
+create or replace function public.template_save(
+  p_token text, p_id bigint, p_keyword text, p_title text, p_body text, p_link text default null,
+  p_category text default null, p_body_kz text default null, p_notice text default null, p_image text default null)
+returns json
+language plpgsql security definer
+set search_path = public, extensions
+as $$
+declare
+  t public.templates;
+begin
+  perform public._auth(p_token, 'admin');
+  if coalesce(trim(p_keyword), '') = '' or coalesce(trim(p_title), '') = '' or coalesce(trim(p_body), '') = '' then
+    raise exception 'VALIDATION';
+  end if;
+  if coalesce(p_image, '') <> '' and (p_image !~ '^data:image/(png|jpeg|webp);base64,' or length(p_image) > 3000000) then
+    raise exception 'VALIDATION';
+  end if;
+  if p_id is null then
+    insert into public.templates (keyword, title, category, body, body_kz, link, notice, image)
+    values (trim(p_keyword), trim(p_title), nullif(trim(coalesce(p_category, '')), ''), trim(p_body),
+            nullif(trim(coalesce(p_body_kz, '')), ''), nullif(trim(coalesce(p_link, '')), ''),
+            nullif(trim(coalesce(p_notice, '')), ''), nullif(p_image, ''))
+    returning * into t;
+  else
+    update public.templates
+       set keyword = trim(p_keyword), title = trim(p_title), body = trim(p_body),
+           category = nullif(trim(coalesce(p_category, '')), ''),
+           body_kz = nullif(trim(coalesce(p_body_kz, '')), ''),
+           link = nullif(trim(coalesce(p_link, '')), ''),
+           notice = nullif(trim(coalesce(p_notice, '')), ''),
+           image = case when p_image is null then image when p_image = '' then null else p_image end,
+           updated_at = now()
+     where id = p_id
+    returning * into t;
+    if not found then raise exception 'NOT_FOUND'; end if;
+  end if;
+  return (to_jsonb(t) - 'image')::json;
+end;
+$$;
+
+-- Темы шаблонов: админ может завести тему заранее, даже пока в ней нет шаблонов.
+create table if not exists public.topics (
+  name        text primary key check (length(trim(name)) between 1 and 60),
+  created_at  timestamptz not null default now()
+);
+
+-- Программы, с которыми работает поддержка: название и ссылка. Видят все, правят админы.
+create table if not exists public.links (
+  id          bigint generated always as identity primary key,
+  title       text not null check (length(trim(title)) between 1 and 80),
+  url         text not null check (url ~* '^https?://' and length(url) <= 1000),
+  note        text check (note is null or length(note) <= 300),
+  sort        int  not null default 100,
+  created_at  timestamptz not null default now()
+);
+
+alter table public.topics enable row level security;
+alter table public.links  enable row level security;
+drop policy if exists "topics are public" on public.topics;
+create policy "topics are public" on public.topics for select to anon, authenticated using (true);
+drop policy if exists "links are public" on public.links;
+create policy "links are public" on public.links for select to anon, authenticated using (true);
+grant select on public.topics, public.links to anon, authenticated;
+revoke insert, update, delete, truncate on public.topics, public.links from anon, authenticated;
+
+create or replace function public.topic_add(p_token text, p_name text)
+returns json
+language plpgsql security definer
+set search_path = public, extensions
+as $$
+declare
+  v text := trim(regexp_replace(coalesce(p_name, ''), '\s+', ' ', 'g'));
+begin
+  perform public._auth(p_token, 'admin');
+  if v = '' or length(v) > 60 then raise exception 'VALIDATION'; end if;
+  insert into public.topics (name) values (v) on conflict do nothing;
+  if found then perform public._log('Тема добавлена', v); end if;
+  return json_build_object('ok', true, 'name', v);
+end;
+$$;
+
+-- Удалить можно только пустую тему (шаблоны сначала перенести).
+create or replace function public.topic_delete(p_token text, p_name text)
+returns json
+language plpgsql security definer
+set search_path = public, extensions
+as $$
+begin
+  perform public._auth(p_token, 'admin');
+  if exists (select 1 from public.templates where category = p_name) then raise exception 'VALIDATION'; end if;
+  delete from public.topics where name = p_name;
+  if found then perform public._log('Тема удалена', p_name); end if;
+  return json_build_object('ok', true);
+end;
+$$;
+
+create or replace function public.link_save(
+  p_token text, p_id bigint, p_title text, p_url text, p_note text default null, p_sort int default 100)
+returns json
+language plpgsql security definer
+set search_path = public, extensions
+as $$
+declare
+  l public.links;
+begin
+  perform public._auth(p_token, 'admin');
+  if coalesce(trim(p_title), '') = '' or coalesce(trim(p_url), '') !~* '^https?://' then raise exception 'VALIDATION'; end if;
+  if p_id is null then
+    insert into public.links (title, url, note, sort)
+    values (left(trim(p_title), 80), left(trim(p_url), 1000), nullif(left(trim(coalesce(p_note, '')), 300), ''), coalesce(p_sort, 100))
+    returning * into l;
+    perform public._log('Программа добавлена', l.title);
+  else
+    update public.links
+       set title = left(trim(p_title), 80), url = left(trim(p_url), 1000),
+           note = nullif(left(trim(coalesce(p_note, '')), 300), ''), sort = coalesce(p_sort, sort)
+     where id = p_id
+    returning * into l;
+    if not found then raise exception 'NOT_FOUND'; end if;
+    perform public._log('Программа изменена', l.title);
+  end if;
+  return row_to_json(l);
+end;
+$$;
+
+create or replace function public.link_delete(p_token text, p_id bigint)
+returns json
+language plpgsql security definer
+set search_path = public, extensions
+as $$
+declare
+  l public.links;
+begin
+  perform public._auth(p_token, 'admin');
+  delete from public.links where id = p_id returning * into l;
+  if found then perform public._log('Программа удалена', l.title); end if;
+  return json_build_object('ok', true);
+end;
+$$;
+
+grant execute on function public.template_save(text, bigint, text, text, text, text, text, text, text, text) to anon, authenticated;
+grant execute on function public.topic_add(text, text)                               to anon, authenticated;
+grant execute on function public.topic_delete(text, text)                            to anon, authenticated;
+grant execute on function public.link_save(text, bigint, text, text, text, int)      to anon, authenticated;
+grant execute on function public.link_delete(text, bigint)                           to anon, authenticated;
+
 -- ---------- Права на функции ----------
 -- Служебные функции закрыты; сайту доступны только «публичные» ручки.
 
@@ -727,7 +858,6 @@ revoke execute on function public.add_access_code(text, text, int, text) from pu
 grant execute on function public.login(text, text)                                   to anon, authenticated;
 grant execute on function public.logout(text)                                        to anon, authenticated;
 grant execute on function public.session_status(text)                                to anon, authenticated;
-grant execute on function public.template_save(text, bigint, text, text, text, text, text, text) to anon, authenticated;
 grant execute on function public.template_delete(text, bigint)                       to anon, authenticated;
 grant execute on function public.templates_import(text, jsonb, boolean)              to anon, authenticated;
 grant execute on function public.shortcut_save(text, bigint, text, text, text)       to anon, authenticated;

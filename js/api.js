@@ -55,7 +55,18 @@
 
     return {
       mode: 'supabase',
-      listTemplates: () => listAll('templates', 'id,keyword,title,category,body,body_kz,link', 'id.asc'),
+      listTemplates: () => listAll('templates', 'id,keyword,title,category,body,body_kz,link,notice,has_image', 'id.asc'),
+      // скриншот шаблона грузим отдельно — только когда он нужен
+      templateImage: async (id) => {
+        const rows = await req('/rest/v1/templates?select=image&id=eq.' + encodeURIComponent(id));
+        return rows && rows[0] ? rows[0].image : null;
+      },
+      listTopics: async () => (await listAll('topics', 'name', 'name.asc')).map((r) => r.name),
+      topicAdd: (token, name) => rpc('topic_add', { p_token: token, p_name: name }),
+      topicDelete: (token, name) => rpc('topic_delete', { p_token: token, p_name: name }),
+      listLinks: () => listAll('links', 'id,title,url,note,sort', 'sort.asc,id.asc'),
+      linkSave: (token, l) => rpc('link_save', { p_token: token, p_id: l.id || null, p_title: l.title, p_url: l.url, p_note: l.note || null, p_sort: l.sort == null ? 100 : l.sort }),
+      linkDelete: (token, id) => rpc('link_delete', { p_token: token, p_id: id }),
       listShortcuts: async () => (await listAll('shortcuts', 'id,kind,short,full_text', 'id.asc'))
         .map((r) => ({ id: r.id, kind: r.kind, short: r.short, full: r.full_text })),
       login: (code, device) => rpc('login', { p_code: code, p_device: device }),
@@ -63,7 +74,8 @@
       status: (token) => rpc('session_status', { p_token: token }),
       saveTemplate: (token, t) => rpc('template_save', {
         p_token: token, p_id: t.id || null, p_keyword: t.keyword, p_title: t.title, p_body: t.body, p_link: t.link || null,
-        p_category: t.category || null, p_body_kz: t.body_kz || null,
+        p_category: t.category || null, p_body_kz: t.body_kz || null, p_notice: t.notice || null,
+        p_image: t.image === undefined ? null : t.image,
       }),
       deleteTemplate: (token, id) => rpc('template_delete', { p_token: token, p_id: id }),
       importTemplates: (token, items, replace) => rpc('templates_import', { p_token: token, p_items: items, p_replace: !!replace }),

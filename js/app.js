@@ -41,6 +41,8 @@
     fill: {},              // значения из строки поиска (телефон, сумма, банк…)
     rest: '',              // строка поиска без этих значений
     opName: '',            // имя оператора для {имя} в шаблонах
+    topics: [],            // темы, заведённые админами (могут быть пустыми)
+    links: [],             // «Программы»: рабочие системы и ссылки
   };
 
   let device = store.get('device');
@@ -49,6 +51,8 @@
   state.lang = store.get('lang', 'ru') === 'kz' ? 'kz' : 'ru';
   state.cat = store.get('cat', 'all');
   state.opName = store.get('opname', '');
+  state.topics = store.get('topics', []);
+  state.links = store.get('links', []);
 
   const corrector = C.createCorrector();
 
@@ -216,6 +220,8 @@
     if (!isOwner() && state.tab === 'owner') switchTab('corrector');
     if (!isAdmin() && state.tab === 'sugg') switchTab('corrector');
     renderAnnouncements();
+    renderLinks();
+    renderChips(!!$('#search').value.trim());
     if (isAdmin()) loadSuggestions(true); else $('#sugg-count').textContent = '';
     updateRoleTime();
     renderDictList();
@@ -425,6 +431,7 @@
     if (tab === 'corrector') setTimeout(() => $('#draft').focus(), 30);
     if (tab === 'owner') { loadSessions(); loadJournal(); }
     if (tab === 'sugg') loadSuggestions();
+    if (tab === 'apps') loadLinks();
   }
 
   /* =====================================================================
@@ -487,6 +494,8 @@
       text: 'Продолжаем работу по вашему запросу. Пожалуйста, ожидайте — это может занять некоторое время.' },
     { title: 'В работе: на постоянном контроле', label: 'В работе · на контроле', icon: 'i-shield', c: 8, r: 2,
       text: 'Проверили и видим, что ваш запрос всё ещё в работе у специалистов. После завершения проверки и анализа предоставленных вами данных мы обязательно свяжемся с вами и сообщим результат. Ваш вопрос находится на постоянном контроле. 🤝' },
+    { title: 'Кешбэк зачисляется в течение 48 часов', label: 'Кешбэк · 48 часов', icon: 'i-coin', c: 2, r: 2, hot: true,
+      text: 'Кешбэки обрабатываются и зачисляются в течение 48 часов. Просим вас ожидать.' },
   ];
   const flowText = (n) => {
     const t = state.templates.find((x) => x.title === n.title);
@@ -495,9 +504,9 @@
 
   function renderFlow() {
     $('#flow-map').innerHTML = FLOW.map((n, i) => `
-      <button class="flow-node${n.r === 2 ? ' branch' : ''}" type="button" data-i="${i}" style="--c:${n.c};--r:${n.r};--d:${(i * 0.7) % 3.1}s">
+      <button class="flow-node${n.r === 2 ? ' branch' : ''}${n.hot ? ' hot' : ''}" type="button" data-i="${i}" style="--c:${n.c};--r:${n.r};--d:${(i * 0.7) % 3.1}s">
         <span class="flow-ico"><svg><use href="#${n.icon}"/></svg></span>
-        <span class="flow-label">${esc(n.label)}</span>
+        <span class="flow-label">${esc(n.label)}${n.hot ? '<i class="flow-hot">часто</i>' : ''}</span>
         <span class="flow-tip">${esc(flowText(n))}</span>
       </button>`).join('');
   }
@@ -553,6 +562,7 @@
       if (!b || !suggestList[b.dataset.i]) return;
       if (await copyText(F.render(suggestList[b.dataset.i].body, fillVals()))) {
         bubble(ev.clientX, ev.clientY - 6);
+        afterCopy(suggestList[b.dataset.i]);
         b.classList.add('copied');
         setTimeout(() => b.classList.remove('copied'), 900);
       }
@@ -772,7 +782,7 @@
   // Порядок тем в списке; темы, которых здесь нет, идут следом по алфавиту.
   const CAT_ORDER = ['Быстрые фразы', 'Идентификация', 'Кредиты', 'ПТ и аресты', 'Переводы', 'Карты', 'Кешбэк', 'Bilim и Power Card',
     'Реферальная программа', 'Freedom Валюта', 'Рейтинг и eGov', 'Госуслуги', 'eSIM', 'Депозиты и лояльность', 'ВАРМ',
-    'Сервисы и подписки', 'Приложение', 'Выписки и справки', 'Контакты', 'Уточнения', 'Прочее'];
+    'Сервисы и подписки', 'Приложение', 'Нерезиденты', 'Выписки и справки', 'Контакты', 'Уточнения', 'Отзывы и жалобы', 'Прочее'];
   const NO_CAT = 'Без темы';
   const catOf = (t) => (t.category && t.category.trim()) || NO_CAT;
   const catRank = (c) => { const i = CAT_ORDER.indexOf(c); return c === NO_CAT ? 999 : i < 0 ? 500 : i; };
@@ -823,7 +833,8 @@
     const out = [];
     for (const t of state.templates) {
       let r = rankOne(t, nq);
-      if (nr && nr !== nq) { const r2 = rankOne(t, nr); if (r2 !== null && (r === null || r2 < r)) r = r2; }
+      // совпадение без чисел/имён чуть слабее совпадения всей фразы: «кеш 48» — сначала ключ «кеш 48», потом просто «кеш»
+      if (nr && nr !== nq) { const r2 = rankOne(t, nr); if (r2 !== null && (r === null || r2 + 0.1 < r)) r = r2 + 0.1; }
       if (r === null) continue;
       if (keys.length && F.placeholders(t.body + ' ' + (t.body_kz || '')).some((k) => keys.includes(k))) r -= 0.5;
       out.push({ t, rank: r });
@@ -901,14 +912,15 @@
   function renderChips(searching) {
     const counts = new Map();
     state.templates.forEach((t) => counts.set(catOf(t), (counts.get(catOf(t)) || 0) + 1));
+    state.topics.forEach((n) => { if (!counts.has(n)) counts.set(n, 0); });
     const cats = [...counts.keys()].sort(byCat);
     if (state.cat !== 'all' && !counts.has(state.cat)) state.cat = 'all';
     const box = $('#cat-chips');
     box.hidden = !state.templates.length;
     box.classList.toggle('searching', searching);
     box.innerHTML = [['all', 'Все', state.templates.length], ...cats.map((c) => [c, c, counts.get(c)])]
-      .map(([id, label, n]) => `<button class="chip${state.cat === id ? ' active' : ''}" type="button" data-cat="${esc(id)}">${esc(label)}<span>${n}</span></button>`)
-      .join('');
+      .map(([id, label, n]) => `<button class="chip${state.cat === id ? ' active' : ''}${n ? '' : ' empty'}" type="button" data-cat="${esc(id)}">${esc(label)}<span>${n}</span></button>`)
+      .join('') + (isAdmin() ? '<button class="chip chip-add" type="button" data-add-topic title="Добавить новую тему">+ Тема</button>' : '');
   }
 
   function cardHtml(t, i, q, re) {
@@ -920,6 +932,8 @@
           <h3>${hl(t.title, re)}</h3>
           ${tplHasKz(t) ? '<span class="kz-badge" title="Есть текст на казахском">ҚАЗ</span>' : ''}
           ${t.link ? '<svg class="tpl-link-dot" aria-label="есть ссылка"><use href="#i-link"/></svg>' : ''}
+          ${t.has_image ? '<span class="shot-badge" title="К шаблону есть скриншот — без него не отправлять"><svg><use href="#i-image"/></svg>скрин</span>' : ''}
+          ${t.notice ? '<span class="warn-badge" title="Перед отправкой проверьте: есть предупреждение">!</span>' : ''}
         </div>
         <p class="tpl-text">${unmark(hl(snippet(text, q), re))}</p>
         ${fillNote(t)}
@@ -932,6 +946,8 @@
 
   function renderTemplates() {
     if (state.templates.length) { renderFlow(); if (!belowTimer || !$('#suggest').classList.contains('waiting')) renderSuggest($('#draft').value, lastResult || ''); }
+    // выбранная тема могла исчезнуть (удалили тему или последний шаблон в ней)
+    if (state.cat !== 'all' && !state.topics.includes(state.cat) && !state.templates.some((t) => catOf(t) === state.cat)) state.cat = 'all';
     const q = $('#search').value;
     const searching = !!q.trim();
     const res = searchTemplates(q);
@@ -956,7 +972,9 @@
     const empty = $('#tpl-empty');
     if (!res.length) {
       empty.hidden = false;
-      empty.innerHTML = state.templates.length
+      empty.innerHTML = state.templates.length && !searching && state.cat !== 'all'
+        ? `<b>В теме «${esc(state.cat)}» пока нет шаблонов</b>${isAdmin() ? 'Добавьте первый кнопкой «+ Добавить шаблон» — тема подставится сама.' : 'Скоро появятся.'}`
+        : state.templates.length
         ? `<b>Ничего не нашлось по «${esc(q.trim())}»</b>Даже кешбэк не помог. Попробуйте другое слово — или напишите ответ сами, корректор подстрахует.`
         : `<b>Шаблонов пока нет</b>${isOwner() ? 'Загрузите их во вкладке «Сессии» → «Импорт шаблонов».' : 'Скоро появятся.'}`;
     } else {
@@ -972,6 +990,7 @@
     if (await copyText(tplText(t, lang))) {
       bubble(x, y);
       if (lang === 'kz' && !tplHasKz(t)) toast('Казахского текста у этого шаблона нет — скопирован русский', 'warn');
+      afterCopy(t);
       if (card) {
         card.classList.add('copied');
         setTimeout(() => card.classList.remove('copied'), 900);
@@ -1001,6 +1020,7 @@
     });
 
     $('#cat-chips').addEventListener('click', (ev) => {
+      if (ev.target.closest('[data-add-topic]')) { openTopics(); return; }
       const b = ev.target.closest('.chip');
       if (!b) return;
       state.cat = b.dataset.cat;
@@ -1056,7 +1076,7 @@
 
     const drawerCopy = (btn, lang) => {
       const t = findTpl(state.openTemplateId);
-      if (t) copyText(tplText(t, lang)).then((ok) => { if (ok) { pulse(btn); bubbleOver(btn); } });
+      if (t) copyText(tplText(t, lang)).then((ok) => { if (ok) { pulse(btn); bubbleOver(btn); afterCopy(t); } });
     };
     $('#d-copy').addEventListener('click', () => drawerCopy($('#d-copy'), 'ru'));
     $('#d-copy-kz').addEventListener('click', () => drawerCopy($('#d-copy-kz'), 'kz'));
@@ -1094,6 +1114,8 @@
         body: f.elements.body.value.trim(),
         body_kz: f.elements.body_kz.value.trim(),
         link: f.elements.link.value.trim(),
+        notice: f.elements.notice.value.trim(),
+        image: formImage,
       };
       const msg = $('#tpl-form-msg');
       msg.textContent = '';
@@ -1105,7 +1127,10 @@
         try {
           const r = await api.decideSuggestion(state.session && state.session.token, Number(f.dataset.sid) || f.dataset.sid, true, data);
           if (r && r.template) {
-            const row = r.template;
+            let row = r.template;
+            // предупреждение и скрин предложение не несёт — дописываем отдельным сохранением
+            if (data.notice || formImage) row = await api.saveTemplate(state.session && state.session.token, { ...data, id: row.id });
+            if (formImage !== undefined) imgCache.delete(String(row.id));
             state.templates = state.templates.some((x) => String(x.id) === String(row.id))
               ? state.templates.map((x) => (String(x.id) === String(row.id) ? row : x))
               : [...state.templates, row];
@@ -1123,6 +1148,7 @@
       }
       try {
         const row = await api.saveTemplate(state.session && state.session.token, data);
+        if (formImage !== undefined) imgCache.delete(String(row.id));
         if (data.id) state.templates = state.templates.map((x) => (String(x.id) === String(row.id) ? row : x));
         else state.templates = [...state.templates, row];
         store.set('templates', state.templates);
@@ -1159,6 +1185,13 @@
       link.hidden = true;
       link.removeAttribute('href');
     }
+    const dn = $('#d-notice');
+    dn.hidden = !t.notice;
+    $('span', dn).textContent = t.notice || '';
+    $('#d-shot').hidden = !t.has_image;
+    const dimg = $('#d-shot-img');
+    dimg.removeAttribute('src');
+    if (t.has_image) getImage(t.id).then((u) => { if (u && String(state.openTemplateId) === String(t.id)) dimg.src = u; }).catch(() => {});
     $$('#drawer [data-admin]').forEach((el) => { el.hidden = !isAdmin(); });
     $('#d-suggest').hidden = isAdmin();
     openLayer($('#drawer'));
@@ -1173,9 +1206,13 @@
     f.dataset.sid = '';
     $('#tpl-form-title').textContent = t ? 'Редактировать шаблон' : 'Новый шаблон';
     $('#tpl-form-msg').textContent = '';
-    const cats = [...new Set([...CAT_ORDER, ...state.templates.map((x) => x.category).filter(Boolean)])];
+    const cats = [...new Set([...CAT_ORDER, ...state.topics, ...state.templates.map((x) => x.category).filter(Boolean)])];
     $('#cat-list').innerHTML = cats.map((c) => `<option value="${esc(c)}">`).join('');
+    formImage = undefined;
+    setFormPreview(null);
+    if (t && t.has_image) getImage(t.id).then((u) => { if (formImage === undefined && f.dataset.id === String(t.id)) setFormPreview(u); }).catch(() => {});
     if (t) {
+      f.elements.notice.value = t.notice || '';
       f.elements.keyword.value = t.keyword;
       f.elements.title.value = t.title;
       f.elements.category.value = t.category || '';
@@ -1667,6 +1704,380 @@
   }
 
   /* =====================================================================
+   *  Предупреждение при копировании и скриншоты шаблонов
+   * ===================================================================== */
+
+  // Скрин грузится из базы только когда нужен и запоминается до перезагрузки страницы.
+  const imgCache = new Map();
+  function getImage(id) {
+    const key = String(id);
+    if (!imgCache.has(key)) {
+      imgCache.set(key, Promise.resolve(api.templateImage(id)).catch((e) => { imgCache.delete(key); throw e; }));
+    }
+    return imgCache.get(key);
+  }
+
+  function loadImg(url) {
+    return new Promise((resolve, reject) => {
+      const im = new Image();
+      im.onload = () => resolve(im);
+      im.onerror = () => reject(new Error('image'));
+      im.src = url;
+    });
+  }
+
+  // Буфер обмена браузера принимает картинки только в PNG
+  async function toPngBlob(url) {
+    if (!url) throw new Error('no image');
+    const im = await loadImg(url);
+    const c = document.createElement('canvas');
+    c.width = im.naturalWidth;
+    c.height = im.naturalHeight;
+    c.getContext('2d').drawImage(im, 0, 0);
+    return new Promise((resolve, reject) => c.toBlob((b) => (b ? resolve(b) : reject(new Error('png'))), 'image/png'));
+  }
+
+  async function copyImage(id, btn) {
+    try {
+      if (!window.ClipboardItem || !navigator.clipboard || !navigator.clipboard.write) throw new Error('no clipboard');
+      // промис внутри ClipboardItem — чтобы браузер не потерял «клик пользователя», пока картинка готовится
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': getImage(id).then(toPngBlob) })]);
+      if (btn) { pulse(btn); bubbleOver(btn); }
+      toast('Скрин скопирован — вставьте его в Ч2Д (Ctrl+V)', 'ok');
+      return true;
+    } catch (e) {
+      // запасной путь: открыть скрин крупно — его можно скопировать правой кнопкой мыши
+      toast('Браузер не дал скопировать картинку сам. Нажмите на скрин правой кнопкой → «Копировать изображение».', 'warn', 7000);
+      if ($('#shot-view').hidden) viewShot(id);
+      return false;
+    }
+  }
+
+  let shotId = null;
+  async function viewShot(id) {
+    shotId = id;
+    const img = $('#sv-img');
+    img.removeAttribute('src');
+    openLayer($('#shot-view'));
+    try { const u = await getImage(id); if (shotId === id && u) img.src = u; } catch (e) { toast('Скрин не загрузился. Проверьте связь.', 'warn'); }
+  }
+
+  let noticeTpl = null;
+  function afterCopy(t) {
+    if (!t || (!t.notice && !t.has_image)) return;
+    noticeTpl = t;
+    $('#nm-title').textContent = t.has_image ? 'Текст скопирован. Без скрина не отправлять!' : 'Текст скопирован. Проверьте перед отправкой';
+    const text = $('#nm-text');
+    text.textContent = t.notice || '';
+    text.hidden = !t.notice;
+    $('#nm-steps').hidden = !t.has_image;
+    ['#nm-shot', '#nm-view', '#nm-copy-img'].forEach((s) => { $(s).hidden = !t.has_image; });
+    const img = $('#nm-img');
+    img.removeAttribute('src');
+    $('#nm-loading').hidden = false;
+    openLayer($('#notice-modal'));
+    setTimeout(() => $(t.has_image ? '#nm-copy-img' : '#nm-ok').focus(), 60);
+    if (t.has_image) {
+      getImage(t.id).then((u) => {
+        if (noticeTpl !== t || !u) return;
+        img.src = u;
+        $('#nm-loading').hidden = true;
+      }).catch(() => { $('#nm-loading').textContent = 'Скрин не загрузился — проверьте связь'; });
+    }
+  }
+
+  /* ---------- «Лоханулся»: ошибочно отправленное сообщение ---------- */
+  const OOPS_TITLE = 'Лоханулся: предыдущее сообщение отправлено ошибочно';
+  const OOPS_TEXT = 'Просим не обращать внимания на предыдущее сообщение, оно было отправлено ошибочно.';
+  function oopsText(lang) {
+    const t = state.templates.find((x) => x.title === OOPS_TITLE);
+    if (!t) return OOPS_TEXT;
+    return tplText(t, lang);
+  }
+
+  /* ---------- Скрин в форме шаблона ---------- */
+  let formImage; // undefined — не трогали, '' — убрать, data:… — новый скрин
+  function setFormPreview(url) {
+    const img = $('#tpl-img-preview');
+    if (url) { img.src = url; img.hidden = false; } else { img.removeAttribute('src'); img.hidden = true; }
+    $('#tpl-img-hint').hidden = !!url;
+    $('#tpl-img-remove').hidden = !url;
+  }
+  function readFile(file) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.onerror = () => reject(r.error);
+      r.readAsDataURL(file);
+    });
+  }
+  // Уменьшаем до 1600 px по большей стороне и берём то, что легче: PNG или JPEG.
+  async function shrinkImage(file) {
+    const im = await loadImg(await readFile(file));
+    const k = Math.min(1, 1600 / Math.max(im.naturalWidth, im.naturalHeight));
+    const c = document.createElement('canvas');
+    c.width = Math.round(im.naturalWidth * k);
+    c.height = Math.round(im.naturalHeight * k);
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(im, 0, 0, c.width, c.height);
+    const png = c.toDataURL('image/png');
+    const jpg = c.toDataURL('image/jpeg', 0.88);
+    let best = png.length < jpg.length ? png : jpg;
+    if (best.length > 2900000) best = c.toDataURL('image/jpeg', 0.7);
+    if (best.length > 2900000) throw new Error('too big');
+    return best;
+  }
+  async function takeFormImage(file) {
+    if (!file || !/^image\//.test(file.type)) return;
+    try {
+      formImage = await shrinkImage(file);
+      setFormPreview(formImage);
+    } catch (e) {
+      $('#tpl-form-msg').textContent = 'Картинка слишком большая или повреждена. Попробуйте другой скрин.';
+    }
+  }
+
+  /* =====================================================================
+   *  Темы шаблонов
+   * ===================================================================== */
+
+  async function loadTopics() {
+    try {
+      state.topics = await api.listTopics();
+      store.set('topics', state.topics);
+      renderTemplates();
+    } catch (e) { /* темы не критичны */ }
+  }
+
+  function openTopics() {
+    if (!isAdmin()) return;
+    const f = $('#topic-form');
+    f.reset();
+    $('#topic-form-msg').textContent = '';
+    renderTopicList();
+    openLayer($('#topic-modal'));
+    setTimeout(() => f.elements.name.focus(), 50);
+  }
+
+  function renderTopicList() {
+    const used = new Set(state.templates.map(catOf));
+    const empty = state.topics.filter((n) => !used.has(n));
+    $('#topic-empty').hidden = !empty.length;
+    $('#topic-list').innerHTML = empty.map((n) => `<li><span>${esc(n)}</span><button class="btn ghost" type="button" data-del-topic="${esc(n)}">Удалить</button></li>`).join('');
+  }
+
+  /* =====================================================================
+   *  Программы (ссылки на рабочие системы)
+   * ===================================================================== */
+
+  const safeUrl = (u) => (/^https?:\/\//i.test(String(u || '')) ? u : '');
+  const urlHost = (u) => { try { return new URL(u).host.replace(/^www\./, ''); } catch (e) { return u; } };
+  const appMark = (title) => {
+    const w = String(title || '?').trim().split(/\s+/);
+    return (w.length > 1 && w[0].length < 4 ? w[0] : w[0].slice(0, 2)).slice(0, 3);
+  };
+
+  async function loadLinks() {
+    try {
+      state.links = await api.listLinks();
+      store.set('links', state.links);
+    } catch (e) {
+      if (!state.links.length) {
+        $('#apps-empty').hidden = false;
+        $('#apps-empty').innerHTML = '<b>Список не загрузился</b>Нет связи с базой. Обновите страницу чуть позже.';
+        return;
+      }
+    }
+    renderLinks();
+  }
+
+  function renderLinks() {
+    const list = state.links;
+    $('#apps-list').innerHTML = list.map((l, i) => {
+      const url = safeUrl(l.url);
+      return `
+      <article class="app-card" style="--i:${i}" data-id="${esc(l.id)}">
+        <a class="app-open" ${url ? `href="${esc(url)}"` : ''} target="_blank" rel="noopener noreferrer">
+          <span class="app-mark" aria-hidden="true">${esc(appMark(l.title))}</span>
+          <span class="app-main">
+            <b>${esc(l.title)}</b>
+            <span class="app-host">${esc(urlHost(l.url))}</span>
+            ${l.note ? `<span class="app-note">${esc(l.note)}</span>` : ''}
+          </span>
+          <svg class="app-ext" aria-hidden="true"><use href="#i-external"/></svg>
+        </a>
+        <div class="app-actions">
+          <button class="btn ghost app-copy" type="button"><svg class="ico"><use href="#i-copy"/></svg>Ссылка</button>
+          ${isAdmin() ? '<button class="btn ghost app-edit" type="button">Изменить</button>' : ''}
+        </div>
+      </article>`;
+    }).join('');
+    const empty = $('#apps-empty');
+    empty.hidden = !!list.length;
+    if (!list.length) empty.innerHTML = `<b>Программ пока нет</b>${isAdmin() ? 'Добавьте первую кнопкой «+ Добавить программу».' : 'Скоро админ их добавит.'}`;
+  }
+
+  function openAppForm(l) {
+    if (!isAdmin()) return;
+    const f = $('#app-form');
+    f.reset();
+    f.dataset.id = l ? l.id : '';
+    $('#app-form-title').textContent = l ? 'Изменить программу' : 'Новая программа';
+    $('#app-form-msg').textContent = '';
+    $('#app-delete').hidden = !l;
+    if (l) {
+      f.elements.title.value = l.title;
+      f.elements.url.value = l.url;
+      f.elements.note.value = l.note || '';
+      f.elements.sort.value = l.sort == null ? 100 : l.sort;
+    } else {
+      f.elements.sort.value = state.links.length ? Math.max(...state.links.map((x) => x.sort || 0)) + 1 : 1;
+    }
+    openLayer($('#app-modal'));
+    setTimeout(() => f.elements.title.focus(), 50);
+  }
+
+  function bindExtra() {
+    // окно после копирования
+    $('#nm-copy-img').addEventListener('click', () => noticeTpl && copyImage(noticeTpl.id, $('#nm-copy-img')));
+    $('#nm-view').addEventListener('click', () => noticeTpl && viewShot(noticeTpl.id));
+    $('#nm-shot').addEventListener('click', () => noticeTpl && viewShot(noticeTpl.id));
+    $('#sv-copy').addEventListener('click', () => shotId != null && copyImage(shotId, $('#sv-copy')));
+    $('#d-shot-copy').addEventListener('click', () => copyImage(state.openTemplateId, $('#d-shot-copy')));
+    $('#d-shot-view').addEventListener('click', () => viewShot(state.openTemplateId));
+
+    // «Лоханулся»
+    $$('[data-oops]').forEach((b) => b.addEventListener('click', async (ev) => {
+      if (await copyText(oopsText(b.dataset.oops === 'tpl' ? state.lang : 'ru'))) {
+        pulse(b);
+        bubble(ev.clientX || b.getBoundingClientRect().left + 40, (ev.clientY || b.getBoundingClientRect().top) - 6);
+      }
+    }));
+
+    // скрин в форме шаблона
+    $('#tpl-img-file').addEventListener('change', (ev) => { takeFormImage(ev.target.files[0]); ev.target.value = ''; });
+    $('#tpl-img-remove').addEventListener('click', () => { formImage = ''; setFormPreview(null); });
+    const drop = $('#tpl-img-drop');
+    drop.addEventListener('dragover', (ev) => { ev.preventDefault(); drop.classList.add('over'); });
+    drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+    drop.addEventListener('drop', (ev) => {
+      ev.preventDefault();
+      drop.classList.remove('over');
+      takeFormImage(ev.dataTransfer.files[0]);
+    });
+    $('#tpl-form').addEventListener('paste', (ev) => {
+      const item = Array.from((ev.clipboardData && ev.clipboardData.items) || []).find((x) => x.kind === 'file' && /^image\//.test(x.type));
+      if (!item) return;
+      ev.preventDefault();
+      takeFormImage(item.getAsFile());
+    });
+
+    // темы
+    $('#topic-form').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const f = ev.target;
+      const name = f.elements.name.value.replace(/\s+/g, ' ').trim();
+      const msg = $('#topic-form-msg');
+      msg.textContent = '';
+      if (!name) return;
+      const exists = [...state.topics, ...state.templates.map(catOf)].some((n) => norm(n) === norm(name));
+      if (exists) { msg.textContent = 'Такая тема уже есть.'; return; }
+      try {
+        const r = await api.topicAdd(state.session && state.session.token, name);
+        state.topics = [...state.topics, r.name || name];
+        store.set('topics', state.topics);
+        state.cat = r.name || name;
+        store.set('cat', state.cat);
+        $('#search').value = '';
+        renderTemplates();
+        closeLayer($('#topic-modal'));
+        toast(`Тема «${r.name || name}» добавлена`, 'ok');
+      } catch (e) {
+        if (!handleSessionError(e)) msg.textContent = e.code === 'NETWORK' ? 'Нет связи с базой.' : 'Не получилось добавить тему.';
+      }
+    });
+    $('#topic-list').addEventListener('click', async (ev) => {
+      const b = ev.target.closest('[data-del-topic]');
+      if (!b) return;
+      const name = b.dataset.delTopic;
+      try {
+        await api.topicDelete(state.session && state.session.token, name);
+        state.topics = state.topics.filter((n) => n !== name);
+        store.set('topics', state.topics);
+        renderTopicList();
+        renderTemplates();
+        toast(`Тема «${name}» удалена`);
+      } catch (e) {
+        if (!handleSessionError(e)) toast(e.code === 'VALIDATION' ? 'В теме есть шаблоны — сначала перенесите их.' : 'Не получилось удалить тему.', 'warn');
+      }
+    });
+
+    // программы
+    $('#btn-add-app').addEventListener('click', () => openAppForm(null));
+    $('#apps-list').addEventListener('click', async (ev) => {
+      const card = ev.target.closest('.app-card');
+      if (!card) return;
+      const l = state.links.find((x) => String(x.id) === card.dataset.id);
+      if (!l) return;
+      if (ev.target.closest('.app-copy')) {
+        const b = ev.target.closest('.app-copy');
+        if (await copyText(l.url)) { pulse(b); bubbleOver(b); }
+      } else if (ev.target.closest('.app-edit')) {
+        openAppForm(l);
+      }
+    });
+    $('#app-form').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const f = ev.target;
+      const msg = $('#app-form-msg');
+      msg.textContent = '';
+      let url = f.elements.url.value.trim();
+      if (url && !/^https?:\/\//i.test(url)) url = 'https://' + url;
+      const data = {
+        id: f.dataset.id ? Number(f.dataset.id) || f.dataset.id : null,
+        title: f.elements.title.value.trim(),
+        url,
+        note: f.elements.note.value.trim(),
+        sort: Number(f.elements.sort.value) || 0,
+      };
+      if (!data.title || !data.url) { msg.textContent = 'Название и ссылка обязательны.'; return; }
+      const btn = $('button[type=submit]', f);
+      btn.disabled = true;
+      try {
+        const row = await api.linkSave(state.session && state.session.token, data);
+        state.links = (data.id ? state.links.map((x) => (String(x.id) === String(row.id) ? row : x)) : [...state.links, row])
+          .sort((a, b) => (a.sort || 0) - (b.sort || 0) || a.id - b.id);
+        store.set('links', state.links);
+        renderLinks();
+        closeLayer($('#app-modal'));
+        toast(data.id ? 'Программа обновлена' : 'Программа добавлена', 'ok');
+      } catch (e) {
+        if (!handleSessionError(e)) msg.textContent = e.code === 'NETWORK' ? 'Нет связи с базой.' : 'Не получилось сохранить. Проверьте ссылку.';
+      }
+      btn.disabled = false;
+    });
+    $('#app-delete').addEventListener('click', async () => {
+      const f = $('#app-form');
+      const l = state.links.find((x) => String(x.id) === f.dataset.id);
+      if (!l) return;
+      closeLayer($('#app-modal'));
+      const ok = await confirmBox('Удалить программу?', `«${l.title}» пропадёт из списка у всех.`, 'Удалить');
+      if (!ok) return;
+      try {
+        await api.linkDelete(state.session && state.session.token, l.id);
+        state.links = state.links.filter((x) => x.id !== l.id);
+        store.set('links', state.links);
+        renderLinks();
+        toast('Программа удалена');
+      } catch (e) {
+        if (!handleSessionError(e)) toast('Не получилось удалить. Попробуйте ещё раз.', 'warn');
+      }
+    });
+  }
+
+  /* =====================================================================
    *  Слои: модальные окна и выезжающая панель
    * ===================================================================== */
 
@@ -1710,7 +2121,7 @@
     });
     document.addEventListener('keydown', (ev) => {
       if (ev.key === 'Escape') {
-        const open = ['#confirm-modal', '#tpl-modal', '#dict-modal', '#drawer'].map((s) => $(s)).find((el) => !el.hidden);
+        const open = ['#confirm-modal', '#shot-view', '#notice-modal', '#app-modal', '#topic-modal', '#tpl-modal', '#dict-modal', '#drawer'].map((s) => $(s)).find((el) => !el.hidden);
         if (open) { ev.preventDefault(); closeLayer(open); }
       }
     });
@@ -1734,7 +2145,7 @@
     });
 
     document.addEventListener('keydown', (ev) => {
-      const layerOpen = ['#confirm-modal', '#tpl-modal', '#dict-modal', '#drawer', '#gate'].some((s) => !$(s).hidden);
+      const layerOpen = ['#confirm-modal', '#tpl-modal', '#dict-modal', '#drawer', '#gate', '#notice-modal', '#shot-view', '#app-modal', '#topic-modal'].some((s) => !$(s).hidden);
       if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey) && state.tab === 'corrector' && !layerOpen) {
         ev.preventDefault();
         copyResult(true);
@@ -1794,6 +2205,7 @@
     bindFlow();
     bindOwner();
     bindTeam();
+    bindExtra();
     bindLayers();
     bindGlobal();
 
@@ -1817,6 +2229,8 @@
 
     loadEntries();
     loadTemplates();
+    loadTopics();
+    loadLinks();
     loadAnnouncements();
   }
 
