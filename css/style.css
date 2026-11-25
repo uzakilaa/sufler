@@ -966,3 +966,10 @@ html { scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: rgba(67
   .memo-grid code, .memo-grid code + code { grid-column: auto; margin-bottom: 6px; }
   .flow-head .bye-btn { margin-left: 0; }
 }
+
+/* имя при входе по коду */
+.code-name {
+  width: 100%; margin-top: 10px; border: 1px solid var(--line); border-radius: 14px; padding: 11px 14px; background: #fff;
+  font: inherit; font-size: 15px; color: var(--ink); text-align: center; outline: none; transition: border-color .2s, box-shadow .2s;
+}
+.code-name:focus { border-color: var(--sage); box-shadow: 0 0 0 5px rgba(173, 188, 159, .3); }

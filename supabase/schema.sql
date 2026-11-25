@@ -108,36 +108,7 @@ as $$
 $$;
 
 -- Проверяет токен сессии. Бросает ошибку с понятным кодом, если сессия не годится.
-create or replace function public._auth(p_token text, p_min_role text default 'admin')
-returns public.sessions
-language plpgsql security definer
-set search_path = public, extensions
-as $$
-declare
-  s public.sessions;
-begin
-  if coalesce(p_token, '') = '' then
-    raise exception 'SESSION_INVALID';
-  end if;
-  select * into s from public.sessions where token_hash = public._hash_token(p_token);
-  if not found then
-    raise exception 'SESSION_INVALID';
-  end if;
-  if s.ended_at is not null then
-    if s.end_reason = 'kicked' then raise exception 'SESSION_KICKED'; end if;
-    raise exception 'SESSION_ENDED';
-  end if;
-  if s.expires_at <= now() then
-    raise exception 'SESSION_EXPIRED';
-  end if;
-  if p_min_role = 'owner' and s.role <> 'owner' then
-    raise exception 'FORBIDDEN';
-  end if;
-  -- кто действует — для журнала изменений (до конца текущего запроса)
-  perform set_config('sufler.actor', coalesce((select label from public.access_codes where id = s.code_id), s.role), true);
-  return s;
-end;
-$$;
+-- _auth — ниже, в блоке «Имя человека в сессии».
 
 -- Добавить код. Вызывается только владельцем базы из SQL Editor, с сайта недоступна.
 create or replace function public.add_access_code(p_code text, p_role text, p_max_sessions int default 1, p_label text default '')
@@ -379,26 +350,7 @@ $$;
 
 -- ---------- Панель владельца ----------
 
-create or replace function public.owner_sessions(p_token text)
-returns json
-language plpgsql security definer
-set search_path = public, extensions
-as $$
-declare
-  me public.sessions;
-begin
-  me := public._auth(p_token, 'owner');
-  return (
-    select coalesce(json_agg(json_build_object(
-             'id', s.id, 'code', c.label, 'role', s.role,
-             'created_at', s.created_at, 'expires_at', s.expires_at,
-             'is_me', s.id = me.id) order by s.created_at), '[]'::json)
-      from public.sessions s
-      join public.access_codes c on c.id = s.code_id
-     where s.ended_at is null and s.expires_at > now()
-  );
-end;
-$$;
+-- owner_sessions — ниже, в блоке «Имя человека в сессии».
 
 create or replace function public.owner_kick(p_token text, p_session_id uuid)
 returns json
@@ -846,6 +798,83 @@ grant execute on function public.topic_add(text, text)                          
 grant execute on function public.topic_delete(text, text)                            to anon, authenticated;
 grant execute on function public.link_save(text, bigint, text, text, text, int)      to anon, authenticated;
 grant execute on function public.link_delete(text, bigint)                           to anon, authenticated;
+
+-- ---------- Имя человека в сессии: в журнале «Админ 2 · Айдана» ----------
+alter table public.sessions add column if not exists person text;
+alter table public.sessions drop constraint if exists sessions_person_len;
+alter table public.sessions add constraint sessions_person_len check (person is null or length(person) <= 40);
+
+create or replace function public._auth(p_token text, p_min_role text default 'admin')
+returns public.sessions
+language plpgsql security definer
+set search_path = public, extensions
+as $$
+declare
+  s public.sessions;
+begin
+  if coalesce(p_token, '') = '' then
+    raise exception 'SESSION_INVALID';
+  end if;
+  select * into s from public.sessions where token_hash = public._hash_token(p_token);
+  if not found then
+    raise exception 'SESSION_INVALID';
+  end if;
+  if s.ended_at is not null then
+    if s.end_reason = 'kicked' then raise exception 'SESSION_KICKED'; end if;
+    raise exception 'SESSION_ENDED';
+  end if;
+  if s.expires_at <= now() then
+    raise exception 'SESSION_EXPIRED';
+  end if;
+  if p_min_role = 'owner' and s.role <> 'owner' then
+    raise exception 'FORBIDDEN';
+  end if;
+  -- кто действует — для журнала изменений (до конца текущего запроса): «Админ 2 · Айдана»
+  perform set_config('sufler.actor',
+    coalesce(nullif((select label from public.access_codes where id = s.code_id), ''), s.role)
+      || coalesce(' · ' || nullif(s.person, ''), ''), true);
+  return s;
+end;
+$$;
+
+-- Имя человека, который вошёл по коду (необязательно). Видно в журнале и в списке сессий.
+create or replace function public.session_set_name(p_token text, p_name text)
+returns json
+language plpgsql security definer
+set search_path = public, extensions
+as $$
+declare
+  s public.sessions;
+  v text := nullif(left(trim(regexp_replace(coalesce(p_name, ''), '\s+', ' ', 'g')), 40), '');
+begin
+  s := public._auth(p_token, 'admin');
+  update public.sessions set person = v where id = s.id;
+  return json_build_object('ok', true, 'person', v);
+end;
+$$;
+
+create or replace function public.owner_sessions(p_token text)
+returns json
+language plpgsql security definer
+set search_path = public, extensions
+as $$
+declare
+  me public.sessions;
+begin
+  me := public._auth(p_token, 'owner');
+  return (
+    select coalesce(json_agg(json_build_object(
+             'id', s.id, 'code', c.label, 'person', s.person, 'role', s.role,
+             'created_at', s.created_at, 'expires_at', s.expires_at,
+             'is_me', s.id = me.id) order by s.created_at), '[]'::json)
+      from public.sessions s
+      join public.access_codes c on c.id = s.code_id
+     where s.ended_at is null and s.expires_at > now()
+  );
+end;
+$$;
+
+grant execute on function public.session_set_name(text, text) to anon, authenticated;
 
 -- ---------- Права на функции ----------
 -- Служебные функции закрыты; сайту доступны только «публичные» ручки.

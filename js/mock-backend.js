@@ -69,7 +69,7 @@
     return s;
   }
 
-  const actor = (s) => (DEMO_CODES.find((c) => c.id === s.code_id) || {}).label || s.role;
+  const actor = (s) => ((DEMO_CODES.find((c) => c.id === s.code_id) || {}).label || s.role) + (s.person ? ' · ' + s.person : '');
   const log = (db, who, action, details) => db.journal.push({ at: new Date().toISOString(), actor: who, action, details: String(details || '').slice(0, 500) });
 
   window.SuflerMock = function () {
@@ -247,10 +247,15 @@
         return { ok: true, template: row ? clone(row) : null };
       }),
       journal: (token) => run((db) => { auth(db, token, 'owner'); return clone(db.journal.slice().reverse()); }),
+      setSessionName: (token, name) => run((db) => {
+        const s = auth(db, token, 'admin');
+        s.person = String(name || '').replace(/\s+/g, ' ').trim().slice(0, 40) || null;
+        return { ok: true, person: s.person };
+      }),
       ownerSessions: (token) => run((db) => {
         const me = auth(db, token, 'owner');
         return db.sessions.filter(isActive).map((s) => ({
-          id: s.id, code: DEMO_CODES.find((c) => c.id === s.code_id).label, role: s.role,
+          id: s.id, code: DEMO_CODES.find((c) => c.id === s.code_id).label, person: s.person || null, role: s.role,
           created_at: s.created_at, expires_at: s.expires_at, is_me: s.id === me.id,
         }));
       }),

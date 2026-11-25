@@ -208,7 +208,7 @@
 
   function renderRole() {
     const role = state.role || 'guest';
-    $('#role-name').textContent = ROLE_NAMES[role];
+    $('#role-name').textContent = ROLE_NAMES[role] + (role !== 'guest' && state.session && state.session.person ? ' · ' + state.session.person : '');
     $('#role-pill').classList.toggle('admin', role !== 'guest');
     $('#btn-logout').hidden = role === 'guest';
     $$('[data-admin]').forEach((el) => { el.hidden = !isAdmin(); });
@@ -357,6 +357,7 @@
       $('#gate-choices').hidden = true;
       $('#code-form').hidden = false;
       $('#code-input').value = '';
+      $('#code-name').value = store.get('person', '') || state.opName || '';
       setTimeout(() => $('#code-input').focus(), 30);
     }));
 
@@ -378,7 +379,11 @@
       try {
         const r = await api.login(code, device);
         if (r.ok) {
-          setRole(r.role, { token: r.token, role: r.role, expires_at: r.expires_at, session_id: r.session_id });
+          const person = $('#code-name').value.replace(/\s+/g, ' ').trim().slice(0, 40);
+          store.set('person', person);
+          setRole(r.role, { token: r.token, role: r.role, expires_at: r.expires_at, session_id: r.session_id, person });
+          // имя — для журнала («Админ 2 · Айдана»); если не вышло, вход всё равно состоялся
+          if (person) api.setSessionName(r.token, person).catch(() => {});
           lastCheck = Date.now();
           hideGate();
           toast(r.role === 'owner' ? 'С возвращением, владелец. Всё под контролем.' : 'Вы вошли как админ. Шаблоны в вашей власти.', 'ok');
@@ -1253,7 +1258,7 @@
         const t = new Date(s.created_at);
         const when = t.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
         return `<tr class="${s.is_me ? 'me' : ''}" style="animation-delay:${i * 50}ms">
-          <td><b>${esc(s.code)}</b>${s.is_me ? '<span class="me-badge">Это вы</span>' : ''}</td>
+          <td><b>${esc(s.code)}</b>${s.person ? ' · ' + esc(s.person) : ''}${s.is_me ? '<span class="me-badge">Это вы</span>' : ''}</td>
           <td>${esc(ROLE_NAMES[s.role] || s.role)}</td>
           <td>${esc(when)}</td>
           <td>${fmtLeft(left)}<div class="bar"><span style="width:${pct}%"></span></div></td>

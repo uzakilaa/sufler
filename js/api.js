@@ -85,6 +85,7 @@
       },
       deleteShortcut: (token, id) => rpc('shortcut_delete', { p_token: token, p_id: id }),
       ownerSessions: (token) => rpc('owner_sessions', { p_token: token }),
+      setSessionName: (token, name) => rpc('session_set_name', { p_token: token, p_name: name || '' }),
       announcements: () => rpc('announcements_active', {}),
       announce: (token, body, hours) => rpc('announce_create', { p_token: token, p_body: body, p_hours: hours }),
       announceEnd: (token, id) => rpc('announce_end', { p_token: token, p_id: id }),
