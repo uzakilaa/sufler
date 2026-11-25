@@ -90,6 +90,18 @@
     return [...out];
   }
 
+  // Телефон: казахстанский/российский → «+7 701 000 0000», иностранный — как написали (с «+»)
+  function phoneOf(raw) {
+    const digits = String(raw).replace(/\D/g, '');
+    if (digits.length < 7 || digits.length > 15) return null;
+    if ((digits.length === 11 && /^[78]/.test(digits)) || (digits.length === 10 && digits[0] === '7')) {
+      const d = digits.length === 11 ? digits.slice(1) : digits;
+      return `+7 ${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6)}`;
+    }
+    const t = String(raw).trim().replace(/\s+/g, ' ');
+    return t.startsWith('+') ? t : '+' + t;
+  }
+
   const group3 = (digits) => digits.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 
   // Ищет значения в строке поиска. rest — что осталось для обычного поиска по словам.
@@ -113,6 +125,11 @@
     // ICCID после слова-подсказки — любой длины от 10 цифр: «iccd 3289…», «iccid: 8997 …», «айсисиайди 89…»
     after(/(?:^|\s)(?:iccid|iccd|icc|айсисиайди|айсиси)[\s:№#—-]*(\d[\d\s-]{8,30}\d)(?![\d])/i,
       (m) => { const d = m[1].replace(/\D/g, ''); return d.length >= 10 && d.length <= 24 ? ['iccid', d] : null; });
+    // Телефон после слова-подсказки: «идентиф +998 90 123 45 67», «тел 87011234567»
+    after(/(?:^|\s)(?:идентиф[а-яё]*|иден|тел|телефон[а-яё]*|номер телефона|phone)[\s:№#—-]*(\+?\d[\d\s()-]{5,22}\d)(?![\d])/i, (m) => {
+      const p = phoneOf(m[1]);
+      return p ? ['phone', p] : null;
+    });
     // MCC-код: «мсс 4722», «mcc 5411», «мсс код 4722» (мсс — и русскими буквами)
     after(/(?:^|\s)(?:mcc|мсс)(?:[\s-]*(?:код|кода|code))?[\s:—-]*(\d{4})(?!\d)/i, (m) => ['mcc', m[1]]);
     // Номер обращения: «заявл 123456», «тикет 123456», «№123456»
@@ -120,8 +137,11 @@
     // ID мерчанта: «мерч 165459», «мерчант id 165459»
     after(/(?:^|\s)(?:мерч|мерчант|мерчанта|merchant)(?:[\s:]*id)?[\s:№#—-]*(\d{3,12})(?!\d)/i, (m) => ['merchant', m[1]]);
     // Модель: «модель A2848», «модель MTP00ZA/A»
-    after(/(?:^|\s)(?:модель|модели|model)[\s:—-]+([A-Za-z0-9]{2,10}(?:\/[A-Za-z])?)(?![A-Za-z0-9\/])/i,
-      (m) => (/\d/.test(m[1]) && /[A-Za-z]/.test(m[1]) ? ['model', m[1].toUpperCase()] : null));
+    after(/(?:^|\s)(?:модель|модели|model)[\s:—-]+([A-Za-z0-9][A-Za-z0-9\/-]*(?:\s+[A-Za-z0-9][A-Za-z0-9\/-]*){0,3})(?=\s|$)/i, (m) => {
+      if (!/\d/.test(m[1])) return null;
+      const one = !/\s/.test(m[1]);
+      return ['model', one ? m[1].toUpperCase() : m[1].replace(/\s+/g, ' ')];
+    });
     // ФИО ЧСИ: «чси хамзин жаслан ерланович» (2–3 слова после «чси»)
     after(new RegExp('(?:^|\\s)(?:чси|исполнитель)[\\s:—-]+(' + W + '+(?:-' + W + '+)?(?:\\s+' + W + '+(?:-' + W + '+)?){1,2})(?=\\s|$)', 'i'), (m) => {
       const words = m[1].split(/\s+/);
@@ -134,6 +154,15 @@
       if (values.model) break;
       if (/\d/.test(m[0])) { values.model = m[0].toUpperCase(); cut(m); break; }
     }
+    // Дата: 2026-02-01
+    for (const m of s.matchAll(/(?<!\d)(\d{4})-(\d{1,2})-(\d{1,2})(?!\d)/g)) {
+      const mo = +m[2], d = +m[3];
+      if (d >= 1 && d <= 31 && mo >= 1 && mo <= 12) {
+        values.date = String(d).padStart(2, '0') + '.' + String(mo).padStart(2, '0') + '.' + m[1];
+        cut(m);
+        break;
+      }
+    }
     // Дата: 01.02.2026, 7.9.26
     for (const m of s.matchAll(/(?<!\d)(\d{1,2})[./](\d{1,2})[./](\d{4}|\d{2})(?!\d)/g)) {
       const d = +m[1], mo = +m[2];
@@ -142,6 +171,13 @@
         values.date = String(d).padStart(2, '0') + '.' + String(mo).padStart(2, '0') + '.' + y;
         cut(m);
         break;
+      }
+    }
+    // Номер с «+» — это телефон, любой страны: +998 90 123 45 67, +44 7700 900123
+    if (!values.phone) {
+      for (const m of [...s.matchAll(/\+\d[\d\s()-]{5,22}\d(?![\d])/g)]) {
+        const p = phoneOf(m[0]);
+        if (p) { values.phone = p; cut(m); break; }
       }
     }
     // Длинные номера: ICCID, телефон, полный номер карты
@@ -162,7 +198,7 @@
     if (star && !values.card) { values.card = star[1]; cut(star); }
     // Сумма: 5000, 5 000, 1 500,50
     const am = s.match(/(?<![\d.,\p{L}])\d{1,3}(?:[ \u00a0]\d{3})+(?:[.,]\d{1,2})?(?![\d.,\p{L}])|(?<![\d.,\p{L}])\d+(?:[.,]\d{1,2})?(?![\d.,\p{L}])/u);
-    if (am) {
+    if (am && am[0].replace(/\D/g, '').length > 14) { /* это номер, а не сумма */ } else if (am) {
       const [int, frac] = am[0].replace(/[ \u00a0]/g, '').split(/[.,]/);
       values.amount = group3(int.replace(/^0+(?=\d)/, '')) + (frac ? ',' + frac : '');
       if (!values.card && /^\d{4}$/.test(am[0])) values.card = am[0];
