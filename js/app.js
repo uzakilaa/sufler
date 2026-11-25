@@ -426,8 +426,8 @@
   let lastResult = '';
 
   // Подсказки и варианты тона ниже обновляются не на каждую букву, а когда оператор
-  // перестал печатать на 3 секунды. Пока ждём — старые блоки чуть приглушены.
-  const BELOW_DELAY = 3000;
+  // перестал печатать на 2 секунды. Пока ждём — старые блоки чуть приглушены.
+  const BELOW_DELAY = 2000;
   let belowTimer = 0;
   function renderBelow(draft, out, wait) {
     clearTimeout(belowTimer);
