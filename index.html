@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=19">
+  <link rel="stylesheet" href="css/style.css?v=20">
 </head>
 <body>
   <!-- Фон рисуется кодом: пятна плывут, поверх лёгкое зерно -->
@@ -224,7 +224,9 @@
               <li>ФИО можно вставить капсом из Колвира — сайт сам сделает «Иванов Иван Иванович».</li>
               <li>Своё имя впиши один раз в поле «Меня зовут» на вкладке «Корректор» — оно встанет в приветствия.</li>
               <li>«Прощание» само пишет «доброго утра», «хорошего дня», «хорошего вечера» или «доброй ночи» — по времени.</li>
-              <li>Клик — скопировать. Двойной клик или «Детали» — открыть целиком. <kbd>Enter</kbd> в поиске копирует первый шаблон.</li>
+              <li>Клик — скопировать на русском, <kbd>Shift</kbd> + клик — на казахском (если наверху выбран ҚАЗ — наоборот). Так же работают быстрые фразы, «Лоханулся» и «Прощание».</li>
+              <li>Двойной клик или «Детали» — открыть целиком: там оба языка сразу. <kbd>Enter</kbd> в поиске копирует первый шаблон, <kbd>Shift</kbd>+<kbd>Enter</kbd> — на другом языке.</li>
+              <li>Пишешь в корректоре по-казахски — он сам это поймёт: не будет «чинить» казахские слова русским словарём, а подсказки и быстрые фразы скопирует по-казахски.</li>
               <li>Значки на карточке: <span class="shot-badge">скрин</span> — к ответу есть картинка, без неё не отправляй; <span class="warn-badge">!</span> — проверь текст перед отправкой; <span class="kz-badge">ҚАЗ</span> — есть казахский.</li>
             </ul>
           </div>
@@ -326,7 +328,7 @@
       <p class="d-keys"><span>Ключи:</span> <span id="d-keyword"></span></p>
       <div class="d-body" id="d-body"></div>
       <div class="d-kz" id="d-kz-wrap" hidden>
-        <h4>Қазақша</h4>
+        <h4>Қазақша <span class="kz-draft-note" id="d-kz-draft" hidden>черновик перевода — проверьте перед отправкой</span></h4>
         <div class="d-body" id="d-body-kz"></div>
       </div>
       <div id="d-fill"></div>
@@ -341,6 +343,7 @@
         <button class="btn btn-copy" id="d-copy" type="button"><svg class="ico"><use href="#i-copy"/></svg><span id="d-copy-label">Копировать</span></button>
         <button class="btn btn-copy" id="d-copy-kz" type="button" hidden><svg class="ico"><use href="#i-copy"/></svg>Копировать ҚАЗ</button>
         <span class="spacer"></span>
+        <button class="btn ghost" id="d-kz-ok" type="button" hidden>✓ Казахский проверен</button>
         <button class="btn ghost d-fav" id="d-fav" type="button" data-admin hidden><svg class="ico"><use href="#i-star"/></svg>В избранное</button>
         <button class="btn ghost" id="d-suggest" type="button">Предложить правку</button>
         <button class="btn btn-green" id="d-edit" type="button" data-admin hidden>Редактировать</button>
@@ -556,16 +559,16 @@
 
   <div class="toasts" id="toasts" aria-live="polite"></div>
 
-  <script src="js/config.js?v=19"></script>
-  <script src="js/vocab.js?v=19"></script>
-  <script src="js/words.js?v=19"></script>
-  <script src="js/speller.js?v=19"></script>
-  <script src="js/corrector.js?v=19"></script>
-  <script src="js/tones.js?v=19"></script>
-  <script src="js/fill.js?v=19"></script>
-  <script src="js/api.js?v=19"></script>
-  <script src="js/mock-backend.js?v=19"></script>
-  <script src="js/pets.js?v=19"></script>
-  <script src="js/app.js?v=19"></script>
+  <script src="js/config.js?v=20"></script>
+  <script src="js/vocab.js?v=20"></script>
+  <script src="js/words.js?v=20"></script>
+  <script src="js/speller.js?v=20"></script>
+  <script src="js/corrector.js?v=20"></script>
+  <script src="js/tones.js?v=20"></script>
+  <script src="js/fill.js?v=20"></script>
+  <script src="js/api.js?v=20"></script>
+  <script src="js/mock-backend.js?v=20"></script>
+  <script src="js/pets.js?v=20"></script>
+  <script src="js/app.js?v=20"></script>
 </body>
 </html>

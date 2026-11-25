@@ -503,7 +503,14 @@
     { title: 'Кешбэк зачисляется в течение 48 часов', label: 'Кешбэк · 48 часов', icon: 'i-coin', c: 2, r: 2, hot: true,
       text: 'Кешбэки обрабатываются и зачисляются в течение 48 часов. Просим вас ожидать.' },
   ];
-  const flowText = (n) => {
+  const otherLang = (lang) => (lang === 'kz' ? 'ru' : 'kz');
+  const pickLang = (ev, base) => (ev && ev.shiftKey ? otherLang(base || state.lang) : (base || state.lang));
+  // текст корректора на казахском — подсказки и быстрые фразы тоже по-казахски
+  const draftLang = () => (C.isKazakh && C.isKazakh($('#draft').value) ? 'kz' : 'ru');
+  const noKzWarn = (t, lang) => { if (lang === 'kz' && t && !tplHasKz(t)) toast('Казахского текста у этого шаблона пока нет — скопирован русский', 'warn'); };
+  const flowText = (n, lang) => {
+    const t0 = state.templates.find((x) => x.title === n.title);
+    if (t0 && lang === 'kz' && tplHasKz(t0)) return tplText(t0, 'kz');
     const t = state.templates.find((x) => x.title === n.title);
     return F.render(t ? t.body : n.text, fillVals());
   };
@@ -557,7 +564,10 @@
     $('#flow-map').addEventListener('click', async (ev) => {
       const b = ev.target.closest('.flow-node');
       if (!b) return;
-      if (await copyText(flowText(FLOW[b.dataset.i]))) {
+      const n = FLOW[b.dataset.i];
+      const lang = pickLang(ev, draftLang());
+      if (await copyText(flowText(n, lang))) {
+        noKzWarn(state.templates.find((x) => x.title === n.title), lang);
         bubble(ev.clientX || b.getBoundingClientRect().left + 30, (ev.clientY || b.getBoundingClientRect().top) - 6);
         b.classList.add('copied');
         setTimeout(() => b.classList.remove('copied'), 900);
@@ -566,7 +576,10 @@
     $('#suggest-list').addEventListener('click', async (ev) => {
       const b = ev.target.closest('.sug');
       if (!b || !suggestList[b.dataset.i]) return;
-      if (await copyText(F.render(suggestList[b.dataset.i].body, fillVals()))) {
+      const st = suggestList[b.dataset.i];
+      const lang = pickLang(ev, draftLang());
+      if (await copyText(tplText(st, lang))) {
+        noKzWarn(st, lang);
         bubble(ev.clientX, ev.clientY - 6);
         afterCopy(suggestList[b.dataset.i]);
         b.classList.add('copied');
@@ -578,7 +591,7 @@
 
   let toneList = [];
   function renderTones(text) {
-    toneList = text ? window.SuflerTones.variants(text) : [];
+    toneList = text && !(C.isKazakh && C.isKazakh(text)) ? window.SuflerTones.variants(text) : [];
     const wrap = $('#tones');
     wrap.hidden = !toneList.length;
     $('#tones-list').innerHTML = toneList.map((v, i) => `
@@ -943,7 +956,7 @@
         <div class="tpl-top">
           <span class="kw">${hl(shownKeyword(t), re)}</span>
           <h3>${hl(t.title, re)}</h3>
-          ${tplHasKz(t) ? '<span class="kz-badge" title="Есть текст на казахском">ҚАЗ</span>' : ''}
+          ${tplHasKz(t) ? (t.kz_checked === false ? '<span class="kz-badge draft" title="Казахский — черновик перевода, ещё не проверен">ҚАЗ · черновик</span>' : '<span class="kz-badge" title="Есть текст на казахском">ҚАЗ</span>') : ''}
           ${t.link ? '<svg class="tpl-link-dot" aria-label="есть ссылка"><use href="#i-link"/></svg>' : ''}
           ${t.has_image ? '<span class="shot-badge" title="К шаблону есть скриншот — без него не отправлять"><svg><use href="#i-image"/></svg>скрин</span>' : ''}
           ${t.notice ? '<span class="warn-badge" title="Перед отправкой проверьте: есть предупреждение">!</span>' : ''}
@@ -952,7 +965,7 @@
         <p class="tpl-text">${unmark(hl(snippet(text, q), re))}</p>
         ${fillNote(t)}
         <div class="tpl-foot">
-          <span class="tpl-hint">клик — копия · два — детали</span>
+          <span class="tpl-hint">${tplHasKz(t) ? (state.lang === 'kz' ? 'клик — ҚАЗ · Shift — РУС' : 'клик — РУС · Shift — ҚАЗ') : 'клик — копия'} · два — детали</span>
           <button class="tpl-more" type="button">Детали <span aria-hidden="true">→</span></button>
         </div>
       </article>`;
@@ -1032,7 +1045,7 @@
         const first = $('.tpl');
         if (first) {
           const r = first.getBoundingClientRect();
-          copyTemplate(findTpl(first.dataset.id), r.left + r.width / 2, r.top + 10, first);
+          copyTemplate(findTpl(first.dataset.id), r.left + r.width / 2, r.top + 10, first, pickLang(ev));
         }
       }
       if (ev.key === 'Escape') { ev.target.value = ''; renderTemplates(); }
@@ -1070,12 +1083,15 @@
       if (ev.detail > 1) return;
       const x = ev.clientX;
       const y = ev.clientY - 6;
+      const lang = pickLang(ev);
       card.classList.add('pressing');
       clickTimer = setTimeout(() => {
         card.classList.remove('pressing');
-        copyTemplate(findTpl(card.dataset.id), x, y, card);
+        copyTemplate(findTpl(card.dataset.id), x, y, card, lang);
       }, 230);
     });
+    // Shift+клик не должен выделять текст на странице
+    list.addEventListener('mousedown', (ev) => { if (ev.shiftKey && ev.target.closest('.tpl')) ev.preventDefault(); });
     list.addEventListener('dblclick', (ev) => {
       const card = ev.target.closest('.tpl');
       clearTimeout(clickTimer);
@@ -1101,6 +1117,20 @@
     };
     $('#d-copy').addEventListener('click', () => drawerCopy($('#d-copy'), 'ru'));
     $('#d-copy-kz').addEventListener('click', () => drawerCopy($('#d-copy-kz'), 'kz'));
+    $('#d-kz-ok').addEventListener('click', async () => {
+      const t = findTpl(state.openTemplateId);
+      if (!t) return;
+      try {
+        await api.kzCheck(state.session && state.session.token, t.id, true);
+        t.kz_checked = true;
+        store.set('templates', state.templates);
+        openDetails(t.id);
+        renderTemplates();
+        toast('Казахский текст отмечен как проверенный', 'ok');
+      } catch (e) {
+        if (!handleSessionError(e)) toast('Не получилось отметить. Попробуйте ещё раз.', 'warn');
+      }
+    });
     $('#d-edit').addEventListener('click', () => {
       const t = findTpl(state.openTemplateId);
       closeLayer($('#drawer'));
@@ -1193,6 +1223,9 @@
     $('#d-body').innerHTML = unmark(esc(tplText(t, 'ru', MARK)));
     const kz = tplHasKz(t);
     $('#d-kz-wrap').hidden = !kz;
+    const draft = kz && t.kz_checked === false;
+    $('#d-kz-draft').hidden = !draft;
+    $('#d-kz-ok').hidden = !(draft && isAdmin());
     $('#d-copy-kz').hidden = !kz;
     $('#d-copy-label').textContent = kz ? 'Копировать РУС' : 'Копировать';
     if (kz) $('#d-body-kz').innerHTML = unmark(esc(tplText(t, 'kz', MARK)));
@@ -1813,9 +1846,9 @@
   const OOPS_TEXT = 'Просим не обращать внимания на предыдущее сообщение, оно было отправлено ошибочно.';
   const BYE_TITLE = 'Прощание (по времени суток)';
   const BYE_TEXT = 'Спасибо, что обратились в поддержку Freedom Bank. Желаем вам {пожелание}! 💚';
-  function byeText() {
+  function byeText(lang) {
     const t = state.templates.find((x) => x.title === BYE_TITLE);
-    return t ? tplText(t, 'ru') : F.render(BYE_TEXT, fillVals());
+    return t ? tplText(t, lang || 'ru') : F.render(BYE_TEXT, fillVals());
   }
   function oopsText(lang) {
     const t = state.templates.find((x) => x.title === OOPS_TITLE);
@@ -1978,7 +2011,7 @@
 
     // «Лоханулся»
     $$('[data-oops]').forEach((b) => b.addEventListener('click', async (ev) => {
-      if (await copyText(oopsText(b.dataset.oops === 'tpl' ? state.lang : 'ru'))) {
+      if (await copyText(oopsText(pickLang(ev, b.dataset.oops === 'tpl' ? state.lang : draftLang())))) {
         pulse(b);
         bubble(ev.clientX || b.getBoundingClientRect().left + 40, (ev.clientY || b.getBoundingClientRect().top) - 6);
       }
@@ -1986,9 +2019,9 @@
 
     // «Прощание»: подсказка с текстом под текущее время
     const bye = $('#btn-bye');
-    bye.addEventListener('mouseenter', () => { bye.title = 'Скопировать: «' + byeText() + '»'; });
+    bye.addEventListener('mouseenter', () => { bye.title = 'Скопировать: «' + byeText(draftLang()) + '» · Shift — другой язык'; });
     bye.addEventListener('click', async (ev) => {
-      if (await copyText(byeText())) { pulse(bye); bubble(ev.clientX || bye.getBoundingClientRect().left + 40, (ev.clientY || bye.getBoundingClientRect().top) - 6); }
+      if (await copyText(byeText(pickLang(ev, draftLang())))) { pulse(bye); bubble(ev.clientX || bye.getBoundingClientRect().left + 40, (ev.clientY || bye.getBoundingClientRect().top) - 6); }
     });
 
     // памятка: открыта/закрыта — запоминаем

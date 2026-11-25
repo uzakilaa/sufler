@@ -994,6 +994,45 @@ grant execute on function public.fav_group_save(text, bigint, text)             
 grant execute on function public.fav_group_delete(text, bigint)                  to anon, authenticated;
 grant execute on function public.fav_set(text, bigint, bigint, boolean)          to anon, authenticated;
 
+-- ---------- Казахский: черновик перевода или проверен ----------
+-- kz_checked = false — казахский текст переведён автоматически и ещё не проверен человеком.
+alter table public.templates add column if not exists kz_checked boolean not null default true;
+
+-- Админ поправил казахский текст в форме — значит, проверил.
+create or replace function public._kz_checked_on_edit()
+returns trigger language plpgsql
+as $$
+begin
+  if new.body_kz is distinct from old.body_kz and coalesce(current_setting('sufler.kz_import', true), '') <> 'on' then
+    new.kz_checked := true;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists templates_kz_checked on public.templates;
+create trigger templates_kz_checked before update on public.templates
+  for each row execute function public._kz_checked_on_edit();
+
+-- Кнопка «Казахский проверен» в деталях шаблона
+create or replace function public.template_kz_check(p_token text, p_id bigint, p_checked boolean default true)
+returns json
+language plpgsql security definer
+set search_path = public, extensions
+as $$
+declare
+  t public.templates;
+begin
+  perform public._auth(p_token, 'admin');
+  update public.templates set kz_checked = coalesce(p_checked, true) where id = p_id returning * into t;
+  if not found then raise exception 'NOT_FOUND'; end if;
+  perform public._log(case when coalesce(p_checked, true) then 'Казахский проверен' else 'Казахский — снова черновик' end, t.title);
+  return json_build_object('ok', true);
+end;
+$$;
+
+revoke execute on function public._kz_checked_on_edit() from public, anon, authenticated;
+grant execute on function public.template_kz_check(text, bigint, boolean) to anon, authenticated;
+
 -- ---------- Права на функции ----------
 -- Служебные функции закрыты; сайту доступны только «публичные» ручки.
 

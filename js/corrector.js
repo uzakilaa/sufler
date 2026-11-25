@@ -444,6 +444,57 @@
     return t + '.';
   }
 
+  /* ---------- Казахский текст ---------- */
+  // Строку на казахском русский словарь не «чинит»: только заглавные, точка или вопрос в конце
+  // и казахские сокращения.
+  const KZ_LETTERS = /[әғқңөұүһі]/i;
+  // казахские слова, которые часто пишут русскими буквами (без қ, ң, ү…)
+  const KZ_WORDS = new Set(['рахмет', 'рақмет', 'сау', 'болыныз', 'калай', 'кандай', 'жок', 'жоқ', 'иа', 'иә', 'жане', 'ушин',
+    'сизге', 'сиз', 'сизде', 'бизде', 'биз', 'бар', 'емес', 'керек', 'кутиниз', 'тексеремиз', 'тексерип', 'жатыр', 'кешириниз',
+    'салем', 'саламатсызба', 'салеметсиз', 'мен', 'сен', 'бул', 'осы', 'немесе', 'бойынша', 'туралы', 'ушін', 'үшін', 'кейин',
+    'карта', 'ақша', 'акша', 'шот', 'банк']);
+  const KZ_STRONG = new Set(['рахмет', 'рақмет', 'калай', 'кандай', 'жок', 'иа', 'жане', 'ушин', 'сизге', 'сизде', 'бизде', 'емес',
+    'кутиниз', 'тексеремиз', 'тексерип', 'жатыр', 'кешириниз', 'салем', 'саламатсызба', 'салеметсиз', 'бойынша', 'туралы', 'кейин',
+    'акша', 'болыныз']);
+  function isKazakh(text) {
+    const t = String(text || '');
+    if (KZ_LETTERS.test(t)) return true;
+    const words = lower(t).match(/\p{L}+/gu) || [];
+    const strong = words.filter((w) => KZ_STRONG.has(w)).length;
+    return strong >= 2 || (strong >= 1 && words.filter((w) => KZ_WORDS.has(w)).length >= 2);
+  }
+
+  const KZ_SHORTCUTS = [
+    ['сәл', 'сәлеметсіз бе!'],
+    ['салем', 'сәлеметсіз бе!'],
+    ['рахм', 'рахмет'],
+    ['күт рахм', 'күткеніңізге рахмет!'],
+    ['кутк рахм', 'күткеніңізге рахмет!'],
+    ['кешір', 'кешіріңіз'],
+    ['кешир', 'кешіріңіз'],
+    ['күте тұр', 'күте тұрыңыз'],
+    ['сау бол', 'сау болыңыз!'],
+    ['қайырлы күн', 'қайырлы күн!'],
+  ];
+  const KZ_DICT = buildDict(KZ_SHORTCUTS.map(([short, full]) => ({ kind: 'shortcut', short, full })));
+
+  // Вопрос по-казахски: частицы ма/ме/ба/бе/па/пе или вопросительные слова
+  const KZ_Q_PARTICLE = /(?:^|\s)(?:ма|ме|ба|бе|па|пе)(?:\s*[)»"]*)?$/i;
+  const KZ_Q_WORDS = /(?:^|[^\p{L}])(?:қандай|кандай|қалай|калай|қашан|кашан|қайда|кайда|қайдан|неге|неліктен|қанша|канша|неше|кім|ким|қай|кай|не үшін)(?![\p{L}])/iu;
+  function kzFinish(line) {
+    const t = line.replace(/\s+$/, '');
+    if (!t) return t;
+    const last = t[t.length - 1];
+    if (END.includes(last) || last === ':' || last === ';' || /[\p{Extended_Pictographic}️‍]/u.test(last)) return t;
+    const body = last === ',' ? t.slice(0, -1) : t;
+    // последнее предложение строки
+    const tail = body.split(/[.!?…]\s+/).pop();
+    const q = KZ_Q_PARTICLE.test(tail) || KZ_Q_WORDS.test(tail);
+    // сәлеметсіз бе — приветствие, а не вопрос
+    if (/сәлеметсіз бе$/i.test(tail)) return body + '!';
+    return body + (q ? '?' : '.');
+  }
+
   /* ---------- Главная функция ---------- */
 
   // Исправление слов по словарю русского языка (js/speller.js + js/vocab.js)
@@ -465,13 +516,18 @@
     text = text.split('\n').map((l) => l.trim()).join('\n')
       .replace(/\n{3,}/g, '\n\n').replace(/^\n+|\n+$/g, '');
     text = applyDict(text, dict);
+    // Каждая строка — на своём языке: казахские строки русским словарём не правим
+    const kz = text.split('\n').map(isKazakh);
     const sp = getSpeller();
-    if (sp) text = Speller.correctWords(text, sp, dict ? dict.words : null);
+    text = text.split('\n').map((l, i) => {
+      if (kz[i]) return applyDict(l, KZ_DICT);
+      return sp ? Speller.correctWords(l, sp, dict ? dict.words : null) : l;
+    }).join('\n');
     text = fixSpacing(text);
-    text = text.split('\n').map(processLine).join('\n');
+    text = text.split('\n').map((l, i) => (kz[i] ? l : processLine(l))).join('\n');
     text = fixSpacing(text);
     text = capitalize(text);
-    text = text.split('\n').map(finishLine).join('\n');
+    text = text.split('\n').map((l, i) => (kz[i] ? kzFinish(l) : finishLine(l))).join('\n');
     return restore(text, vault);
   }
 
@@ -513,7 +569,7 @@
   }
 
   const api = {
-    createCorrector, correct, buildDict, diffWords, normKey,
+    createCorrector, correct, buildDict, diffWords, normKey, isKazakh, KZ_SHORTCUTS,
     DEFAULT_SHORTCUTS, DEFAULT_TYPOS, DEFAULT_ENTRIES,
   };
   root.SuflerCorrector = api;

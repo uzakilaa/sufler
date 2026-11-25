@@ -202,6 +202,13 @@
         return { ok: true };
       }),
       announcements: () => run((db) => clone(db.announcements.filter((a) => !a.ended_at && new Date(a.expires_at) > new Date()).reverse().map(({ author, ...a }) => a))),
+      kzCheck: (token, id, checked) => run((db) => {
+        auth(db, token, 'admin');
+        const t = db.templates.find((x) => x.id === id);
+        if (!t) throw err('NOT_FOUND');
+        t.kz_checked = !!checked;
+        return { ok: true };
+      }),
       favsList: (token) => run((db) => {
         const s = auth(db, token, 'admin');
         return clone(db.favs.filter((g) => g.code_id === s.code_id).map(({ code_id, ...g }) => g));

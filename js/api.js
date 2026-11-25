@@ -55,7 +55,7 @@
 
     return {
       mode: 'supabase',
-      listTemplates: () => listAll('templates', 'id,keyword,title,category,body,body_kz,link,notice,has_image', 'id.asc'),
+      listTemplates: () => listAll('templates', 'id,keyword,title,category,body,body_kz,link,notice,has_image,kz_checked', 'id.asc'),
       // скриншот шаблона грузим отдельно — только когда он нужен
       templateImage: async (id) => {
         const rows = await req('/rest/v1/templates?select=image&id=eq.' + encodeURIComponent(id));
@@ -86,6 +86,7 @@
       deleteShortcut: (token, id) => rpc('shortcut_delete', { p_token: token, p_id: id }),
       ownerSessions: (token) => rpc('owner_sessions', { p_token: token }),
       setSessionName: (token, name) => rpc('session_set_name', { p_token: token, p_name: name || '' }),
+      kzCheck: (token, id, checked) => rpc('template_kz_check', { p_token: token, p_id: id, p_checked: !!checked }),
       favsList: (token) => rpc('favs_list', { p_token: token }),
       favGroupSave: (token, id, name) => rpc('fav_group_save', { p_token: token, p_id: id || null, p_name: name }),
       favGroupDelete: (token, id) => rpc('fav_group_delete', { p_token: token, p_id: id }),

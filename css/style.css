@@ -1013,3 +1013,8 @@ html { scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: rgba(67
 .fav-n { font-size: 12px; font-weight: 800; color: var(--muted); background: #fff; border-radius: 999px; padding: 1px 8px; }
 .fav-groups .btn { padding: 6px 12px; font-size: 12.5px; }
 .fav-groups-empty[hidden] { display: none; }
+
+/* казахский: черновик перевода */
+.kz-badge.draft { background: #fff1d1; color: #8a5a06; box-shadow: inset 0 0 0 1px rgba(200, 150, 40, .4); }
+.kz-draft-note { margin-left: 8px; font-size: 11px; font-weight: 700; text-transform: none; letter-spacing: 0; color: #8a5a06; background: #fff1d1; padding: 2px 8px; border-radius: 6px; }
+.kz-draft-note[hidden] { display: none; }
