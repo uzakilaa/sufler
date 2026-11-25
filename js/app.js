@@ -113,7 +113,8 @@
     const items = [];
     FLOAT_TEXTS.forEach(([t, me]) => items.push({ t, cls: 'bubble' + (me ? ' me' : '') }));
     FLOAT_MARKS.forEach((t) => items.push({ t, cls: 'mark' }));
-    items.sort(() => Math.random() - 0.5).forEach((it, i) => {
+    const small = window.matchMedia('(max-width: 760px), (hover: none)').matches;
+    items.sort(() => Math.random() - 0.5).slice(0, small ? 9 : items.length).forEach((it, i) => {
       const el = document.createElement('div');
       el.className = 'floater ' + it.cls;
       const inner = document.createElement('span');
@@ -132,17 +133,25 @@
     });
 
     // Пятна чуть сдвигаются за мышью, глаза суфлёра следят за курсором
+    if (small) return; // на телефоне мыши нет — параллакс не нужен
+    const bgMove = $('.bg-move');
+    const logos = $('.brand-logo, .gate-logo');
     let raf = 0;
+    let last = null;
     window.addEventListener('pointermove', (ev) => {
-      cancelAnimationFrame(raf);
+      last = ev;
+      if (raf) return;
       raf = requestAnimationFrame(() => {
-        const nx = ev.clientX / window.innerWidth - 0.5;
-        const ny = ev.clientY / window.innerHeight - 0.5;
-        const root = document.documentElement.style;
-        root.setProperty('--px', (-nx * 40).toFixed(1) + 'px');
-        root.setProperty('--py', (-ny * 30).toFixed(1) + 'px');
-        root.setProperty('--lx', (nx * 2.4).toFixed(2) + 'px');
-        root.setProperty('--ly', (ny * 1.6).toFixed(2) + 'px');
+        raf = 0;
+        const nx = last.clientX / window.innerWidth - 0.5;
+        const ny = last.clientY / window.innerHeight - 0.5;
+        if (bgMove) {
+          bgMove.style.setProperty('--px', (-nx * 40).toFixed(0) + 'px');
+          bgMove.style.setProperty('--py', (-ny * 30).toFixed(0) + 'px');
+        }
+        const lx = (nx * 2.4).toFixed(1) + 'px';
+        const ly = (ny * 1.6).toFixed(1) + 'px';
+        logos.forEach((l) => { l.style.setProperty('--lx', lx); l.style.setProperty('--ly', ly); });
       });
     }, { passive: true });
   }
@@ -950,7 +959,10 @@
     let raf = 0;
     $('#search').addEventListener('input', () => {
       cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(renderTemplates);
+      raf = requestAnimationFrame(() => {
+        $('#tpl-list').classList.add('quiet');
+        renderTemplates();
+      });
     });
     $('#search').addEventListener('keydown', (ev) => {
       if (ev.key === 'Enter') {
@@ -969,6 +981,7 @@
       if (!b) return;
       state.cat = b.dataset.cat;
       store.set('cat', state.cat);
+      $('#tpl-list').classList.remove('quiet');
       if ($('#search').value.trim()) $('#search').value = '';
       renderTemplates();
     });
