@@ -860,13 +860,16 @@
     return F.render(src, fillVals(), mark);
   }
   // Значения из поиска + имя оператора
-  const fillVals = () => (state.opName ? { ...state.fill, name: state.opName } : state.fill);
+  // Значения из поиска + имя оператора + пожелание по времени суток
+  const fillVals = () => ({ ...F.wishes(), ...state.fill, ...(state.opName ? { name: state.opName } : {}) });
+  const AUTO_KEYS = ['wish', 'wish_kz'];
   const unmark = (html) => html.replace(/\uE010/g, '<span class="filled">').replace(/\uE011/g, '</span>');
 
   function fillNote(t) {
-    const keys = F.placeholders(t.body + ' ' + (t.body_kz || ''));
-    if (!keys.length) return '';
+    const all = F.placeholders(t.body + ' ' + (t.body_kz || ''));
+    const keys = all.filter((k) => !AUTO_KEYS.includes(k));
     const vals = fillVals();
+    if (!keys.length) return all.length ? `<span class="tpl-fill ok">✓ «${esc(vals.wish)}» — по времени суток, само</span>` : '';
     const got = keys.filter((k) => vals[k]);
     const miss = keys.filter((k) => !vals[k] && k !== 'name');
     if (got.length) return `<span class="tpl-fill ok">✓ подставлено: ${esc(got.map((k) => F.LABELS[k]).join(', '))}</span>`;
@@ -1789,6 +1792,12 @@
   /* ---------- «Лоханулся»: ошибочно отправленное сообщение ---------- */
   const OOPS_TITLE = 'Лоханулся: предыдущее сообщение отправлено ошибочно';
   const OOPS_TEXT = 'Просим не обращать внимания на предыдущее сообщение, оно было отправлено ошибочно.';
+  const BYE_TITLE = 'Прощание (по времени суток)';
+  const BYE_TEXT = 'Спасибо, что обратились в поддержку Freedom Bank. Желаем вам {пожелание}! 💚';
+  function byeText() {
+    const t = state.templates.find((x) => x.title === BYE_TITLE);
+    return t ? tplText(t, 'ru') : F.render(BYE_TEXT, fillVals());
+  }
   function oopsText(lang) {
     const t = state.templates.find((x) => x.title === OOPS_TITLE);
     if (!t) return OOPS_TEXT;
@@ -1955,6 +1964,18 @@
         bubble(ev.clientX || b.getBoundingClientRect().left + 40, (ev.clientY || b.getBoundingClientRect().top) - 6);
       }
     }));
+
+    // «Прощание»: подсказка с текстом под текущее время
+    const bye = $('#btn-bye');
+    bye.addEventListener('mouseenter', () => { bye.title = 'Скопировать: «' + byeText() + '»'; });
+    bye.addEventListener('click', async (ev) => {
+      if (await copyText(byeText())) { pulse(bye); bubble(ev.clientX || bye.getBoundingClientRect().left + 40, (ev.clientY || bye.getBoundingClientRect().top) - 6); }
+    });
+
+    // памятка: открыта/закрыта — запоминаем
+    const memo = $('#tpl-memo');
+    memo.open = store.get('memo', false);
+    memo.addEventListener('toggle', () => store.set('memo', memo.open));
 
     // скрин в форме шаблона
     $('#tpl-img-file').addEventListener('change', (ev) => { takeFormImage(ev.target.files[0]); ev.target.value = ''; });
@@ -2195,7 +2216,7 @@
       const note = document.createElement('p');
       note.className = 'demo-note';
       note.textContent = 'Это выдуманные примеры для демо, не из Telegram-канала. В настоящей базе их не будет: туда загружаются ваши шаблоны через импорт.';
-      $('.tpl-help').after(note);
+      $('#tpl-memo').after(note);
     }
 
     bindGate();

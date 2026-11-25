@@ -3,6 +3,7 @@
  *
  * В тексте шаблона можно оставить место:  {телефон} {сумма} {карта} {ICCID} {дата} {модель} {банк} {имя}
  *                                          {MCC} {мерчант} {ЧСИ}
+ *   {пожелание} / {тілек} — сайт сам ставит по времени суток: «доброго утра» / «хорошего дня» / «хорошего вечера» / «доброй ночи»
  *   «мсс 4722» → {MCC}, «мерч 165459» → {мерчант}, «модель A2848» → {модель},
  *   «чси хамзин жаслан ерланович» → {ЧСИ} = «Хамзин Жаслан Ерланович» (из Колвира можно капсом)
  * ({имя} — имя оператора, его вписывают один раз на вкладке «Корректор»)
@@ -54,9 +55,20 @@
     mcc: 'mcc', мсс: 'mcc',
     мерчант: 'merchant', merchant: 'merchant', мерч: 'merchant',
     чси: 'chsi', исполнитель: 'chsi',
+    пожелание: 'wish', тілек: 'wish_kz', тилек: 'wish_kz',
   };
   const LABELS = { iccid: 'ICCID', phone: 'телефон', card: 'карта', amount: 'сумма', date: 'дата', model: 'модель', bank: 'банк', name: 'имя',
-    mcc: 'MCC', merchant: 'ID мерчанта', chsi: 'ФИО ЧСИ' };
+    mcc: 'MCC', merchant: 'ID мерчанта', chsi: 'ФИО ЧСИ',
+    wish: 'пожелание по времени суток', wish_kz: 'пожелание по времени суток' };
+
+  // Пожелание по времени суток (по часам компьютера оператора)
+  function wishes(date) {
+    const h = (date || new Date()).getHours();
+    if (h >= 5 && h < 12) return { wish: 'доброго утра', wish_kz: 'қайырлы таң' };
+    if (h >= 12 && h < 18) return { wish: 'хорошего дня', wish_kz: 'қайырлы күн' };
+    if (h >= 18 && h < 23) return { wish: 'хорошего вечера', wish_kz: 'қайырлы кеш' };
+    return { wish: 'доброй ночи', wish_kz: 'қайырлы түн' };
+  }
 
   // Слова после «чси», которые точно не ФИО
   const NOT_NAME = new Set(['арест', 'ареста', 'аресты', 'арестов', 'счет', 'счета', 'счетов', 'списание', 'списания', 'пт', 'долг',
@@ -64,7 +76,7 @@
     'платежное', 'требование', 'и', 'по', 'на', 'от', 'для', 'это', 'кто', 'как', 'где']);
   const cap = (w) => w.split('-').map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join('-');
 
-  const PH = /\{\s*([a-zа-яё]+)\s*\}/gi;
+  const PH = /\{\s*([a-zа-яёәғқңөұүһі]+)\s*\}/gi;
   const OPT = /\[\[([\s\S]*?)\]\]/g;
   const L = 'a-zа-яёәғқңөұүһі0-9';
   const norm = (s) => String(s || '').toLowerCase().replace(/ё/g, 'е');
@@ -189,7 +201,7 @@
       .replace(/ +$/gm, '');
   }
 
-  const api = { BANKS, LABELS, extract, render, placeholders };
+  const api = { BANKS, LABELS, extract, render, placeholders, wishes };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.SuflerFill = api;
 })(typeof window !== 'undefined' ? window : globalThis);

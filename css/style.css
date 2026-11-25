@@ -937,3 +937,32 @@ html { scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: rgba(67
   .notice-modal .modal-actions .btn { flex: 1 1 auto; }
 }
 .shot-figure img:not([src]), .d-shot-img img:not([src]) { visibility: hidden; }
+
+/* ---------- «Прощание» и памятка ---------- */
+.bye-btn { background: var(--green-soft); color: var(--green-deep); padding: 8px 14px; font-size: 13.5px; box-shadow: inset 0 0 0 1px rgba(67, 104, 80, .25); }
+.bye-btn:hover { background: var(--green); color: var(--cream); }
+.bye-btn.pulse { animation: oopsPulse .55s var(--ease); }
+.flow-head .bye-btn { margin-left: auto; }
+.flow-head .bye-btn + .oops-btn { margin-left: 0; }
+.memo { margin: 12px 0 14px; border-radius: 16px; background: var(--paper); border: 1px solid rgba(67, 104, 80, .16); }
+.memo summary {
+  list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+  font-size: 13.5px; font-weight: 800; color: var(--green-deep); border-radius: 16px; user-select: none;
+}
+.memo summary::-webkit-details-marker { display: none; }
+.memo summary:hover { background: rgba(255, 255, 255, .6); }
+.memo-arrow { margin-left: auto; transition: transform .25s var(--ease); color: var(--muted); }
+.memo[open] .memo-arrow { transform: rotate(180deg); }
+.memo-body { padding: 2px 16px 14px; font-size: 13.5px; line-height: 1.55; color: #4d443b; animation: riseIn .3s var(--ease); }
+.memo-body p { margin: 0 0 10px; }
+.memo-grid { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; align-items: baseline; margin-bottom: 10px; }
+.memo-grid span { font-weight: 700; color: var(--muted); font-size: 12.5px; }
+.memo-grid code { justify-self: start; font-size: 12.5px; background: var(--cream); color: var(--terracotta-deep); padding: 2px 7px; border-radius: 6px; font-weight: 700; }
+.memo-grid code + code { grid-column: 2; }
+.memo-body ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.memo-body .shot-badge, .memo-body .warn-badge, .memo-body .kz-badge { vertical-align: 1px; }
+@media (max-width: 600px) {
+  .memo-grid { grid-template-columns: 1fr; gap: 2px; }
+  .memo-grid code, .memo-grid code + code { grid-column: auto; margin-bottom: 6px; }
+  .flow-head .bye-btn { margin-left: 0; }
+}

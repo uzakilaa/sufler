@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=14">
+  <link rel="stylesheet" href="css/style.css?v=15">
 </head>
 <body>
   <!-- Фон рисуется кодом: пятна плывут, поверх лёгкое зерно -->
@@ -172,6 +172,7 @@
           <div class="flow-head">
             <h2>Быстрые фразы</h2>
             <span class="pane-hint">клик — скопировать · наведите, чтобы прочитать</span>
+            <button class="btn bye-btn" type="button" id="btn-bye"><svg class="ico"><use href="#i-wave"/></svg>Прощание</button>
             <button class="btn oops-btn" type="button" data-oops="ru" title="Скопировать: «Просим не обращать внимания на предыдущее сообщение…»"><svg class="ico"><use href="#i-oops"/></svg>Лоханулся</button>
             <label class="flow-name">Меня зовут <input id="op-name" maxlength="40" placeholder="ваше имя" autocomplete="off" spellcheck="false"></label>
           </div>
@@ -198,7 +199,31 @@
           <button class="btn ghost" id="btn-suggest" type="button">Предложить шаблон</button>
         </div>
         <div class="cat-chips" id="cat-chips" hidden></div>
-        <p class="tpl-help">Клик — скопировать. Двойной клик или «Детали» — открыть целиком. Номер, сумму, карту или банк можно дописать прямо в поиск: <i>идентиф +7 706 000 0000</i>, <i>пт бцк</i>, <i>вал поступил 5000</i> — они встанут в текст.</p>
+        <details class="memo" id="tpl-memo">
+          <summary><svg class="ico"><use href="#i-book"/></svg>Памятка: как вставить номер, сумму, имя в шаблон<span class="memo-arrow" aria-hidden="true">▾</span></summary>
+          <div class="memo-body">
+            <p><b>Главное:</b> пиши в поиск слово шаблона и сразу нужное значение — оно само встанет в текст и подсветится. Потом просто кликни по шаблону.</p>
+            <div class="memo-grid">
+              <span>Телефон</span><code>идентиф +7 706 000 0000</code>
+              <span>Сумма</span><code>вал поступил 5000</code>
+              <span>Последние 4 цифры карты</span><code>инактив 1234</code>
+              <span>Банк (полное название)</span><code>пт бцк</code> <code>пт халык</code>
+              <span>ICCID</span><code>iccd 8931…</code>
+              <span>Дата</span><code>билим 1.2.2026</code>
+              <span>Модель iPhone</span><code>модель A2848</code>
+              <span>MCC-код</span><code>мсс 4722</code>
+              <span>ID мерчанта</span><code>мерч 165459</code>
+              <span>ФИО ЧСИ</span><code>чси иванов иван иванович</code>
+            </div>
+            <ul>
+              <li>ФИО можно вставить капсом из Колвира — сайт сам сделает «Иванов Иван Иванович».</li>
+              <li>Своё имя впиши один раз в поле «Меня зовут» на вкладке «Корректор» — оно встанет в приветствия.</li>
+              <li>«Прощание» само пишет «доброго утра», «хорошего дня», «хорошего вечера» или «доброй ночи» — по времени.</li>
+              <li>Клик — скопировать. Двойной клик или «Детали» — открыть целиком. <kbd>Enter</kbd> в поиске копирует первый шаблон.</li>
+              <li>Значки на карточке: <span class="shot-badge">скрин</span> — к ответу есть картинка, без неё не отправляй; <span class="warn-badge">!</span> — проверь текст перед отправкой; <span class="kz-badge">ҚАЗ</span> — есть казахский.</li>
+            </ul>
+          </div>
+        </details>
         <div class="tpl-list" id="tpl-list"></div>
         <div class="empty" id="tpl-empty" hidden></div>
       </section>
@@ -501,16 +526,16 @@
 
   <div class="toasts" id="toasts" aria-live="polite"></div>
 
-  <script src="js/config.js?v=14"></script>
-  <script src="js/vocab.js?v=14"></script>
-  <script src="js/words.js?v=14"></script>
-  <script src="js/speller.js?v=14"></script>
-  <script src="js/corrector.js?v=14"></script>
-  <script src="js/tones.js?v=14"></script>
-  <script src="js/fill.js?v=14"></script>
-  <script src="js/api.js?v=14"></script>
-  <script src="js/mock-backend.js?v=14"></script>
-  <script src="js/pets.js?v=14"></script>
-  <script src="js/app.js?v=14"></script>
+  <script src="js/config.js?v=15"></script>
+  <script src="js/vocab.js?v=15"></script>
+  <script src="js/words.js?v=15"></script>
+  <script src="js/speller.js?v=15"></script>
+  <script src="js/corrector.js?v=15"></script>
+  <script src="js/tones.js?v=15"></script>
+  <script src="js/fill.js?v=15"></script>
+  <script src="js/api.js?v=15"></script>
+  <script src="js/mock-backend.js?v=15"></script>
+  <script src="js/pets.js?v=15"></script>
+  <script src="js/app.js?v=15"></script>
 </body>
 </html>
