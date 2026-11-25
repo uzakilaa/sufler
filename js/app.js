@@ -104,6 +104,8 @@
     ['карта не работает', 0], ['одну минуту…', 1], ['кешбэк где', 0], ['всё решили 🙌', 1],
     ['а можно быстрее', 0], ['хорошего дня!', 1], ['ну что там', 0], ['понимаю вас', 1],
   ];
+  // Всплывающие на фоне реплики и знаки. Выключены по просьбе (25.11.2026); вернуть — поставить true.
+  const FLOATERS_ON = false;
   const FLOAT_MARKS = [',', ',', '!', '?', '.', '«»', '—', ';', '…', ','];
 
   function startBackground() {
@@ -114,7 +116,7 @@
     FLOAT_TEXTS.forEach(([t, me]) => items.push({ t, cls: 'bubble' + (me ? ' me' : '') }));
     FLOAT_MARKS.forEach((t) => items.push({ t, cls: 'mark' }));
     const small = window.matchMedia('(max-width: 760px), (hover: none)').matches;
-    items.sort(() => Math.random() - 0.5).slice(0, small ? 9 : items.length).forEach((it, i) => {
+    items.sort(() => Math.random() - 0.5).slice(0, FLOATERS_ON ? (small ? 9 : items.length) : 0).forEach((it, i) => {
       const el = document.createElement('div');
       el.className = 'floater ' + it.cls;
       const inner = document.createElement('span');
