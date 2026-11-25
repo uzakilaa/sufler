@@ -12,7 +12,7 @@
   }
 
   const KNOWN = ['SESSION_INVALID', 'SESSION_KICKED', 'SESSION_ENDED', 'SESSION_EXPIRED',
-    'FORBIDDEN', 'DUPLICATE', 'VALIDATION', 'NOT_FOUND'];
+    'FORBIDDEN', 'DUPLICATE', 'VALIDATION', 'NOT_FOUND', 'TOO_MANY'];
 
   window.SuflerSupabase = function (cfg) {
     const base = cfg.supabaseUrl.replace(/\/+$/, '');
@@ -73,6 +73,20 @@
       },
       deleteShortcut: (token, id) => rpc('shortcut_delete', { p_token: token, p_id: id }),
       ownerSessions: (token) => rpc('owner_sessions', { p_token: token }),
+      announcements: () => rpc('announcements_active', {}),
+      announce: (token, body, hours) => rpc('announce_create', { p_token: token, p_body: body, p_hours: hours }),
+      announceEnd: (token, id) => rpc('announce_end', { p_token: token, p_id: id }),
+      suggest: (sg) => rpc('suggestion_create', {
+        p_kind: sg.kind, p_template_id: sg.template_id || null, p_keyword: sg.keyword || null, p_title: sg.title || null,
+        p_category: sg.category || null, p_body: sg.body, p_note: sg.note || null, p_author: sg.author || '',
+      }),
+      suggestions: (token) => rpc('suggestions_list', { p_token: token }),
+      decideSuggestion: (token, id, accept, t) => rpc('suggestion_decide', {
+        p_token: token, p_id: id, p_accept: !!accept,
+        p_keyword: t ? t.keyword : null, p_title: t ? t.title : null, p_category: t ? t.category || null : null,
+        p_body: t ? t.body : null, p_body_kz: t ? t.body_kz || null : null, p_link: t ? t.link || null : null,
+      }),
+      journal: (token) => rpc('owner_journal', { p_token: token, p_limit: 400 }),
       kick: (token, id) => rpc('owner_kick', { p_token: token, p_session_id: id }),
     };
   };

@@ -45,6 +45,9 @@
       db.seq = Math.max(db.shortcuts.length, db.templates.length) + 10;
       save(db);
     }
+    db.announcements = db.announcements || [];
+    db.suggestions = db.suggestions || [];
+    db.journal = db.journal || [];
     return db;
   }
   function save(db) { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { /* приватный режим */ } }
@@ -61,6 +64,9 @@
     if (min === 'owner' && s.role !== 'owner') throw err('FORBIDDEN');
     return s;
   }
+
+  const actor = (s) => (DEMO_CODES.find((c) => c.id === s.code_id) || {}).label || s.role;
+  const log = (db, who, action, details) => db.journal.push({ at: new Date().toISOString(), actor: who, action, details: String(details || '').slice(0, 500) });
 
   window.SuflerMock = function () {
     const run = async (fn) => { await wait(90 + Math.random() * 120); const db = load(); const r = fn(db); save(db); return r; };
@@ -155,6 +161,53 @@
         db.shortcuts = db.shortcuts.filter((x) => x.id !== id);
         return { ok: true };
       }),
+      announcements: () => run((db) => clone(db.announcements.filter((a) => !a.ended_at && new Date(a.expires_at) > new Date()).reverse())),
+      announce: (token, body, hours) => run((db) => {
+        const s = auth(db, token, 'admin');
+        if (!body.trim() || hours < 1 || hours > 48) throw err('VALIDATION');
+        const a = { id: ++db.seq, body: body.trim(), author: actor(s), created_at: new Date().toISOString(), expires_at: new Date(Date.now() + hours * 3600e3).toISOString() };
+        db.announcements.push(a);
+        log(db, actor(s), 'Объявление', a.body + ' · на ' + hours + ' ч');
+        return clone(a);
+      }),
+      announceEnd: (token, id) => run((db) => {
+        const s = auth(db, token, 'admin');
+        const a = db.announcements.find((x) => x.id === id && !x.ended_at);
+        if (a) { a.ended_at = new Date().toISOString(); log(db, actor(s), 'Объявление снято', a.body); }
+        return { ok: true };
+      }),
+      suggest: (sg) => run((db) => {
+        if (!sg.body || (sg.kind === 'new' && (!sg.keyword || !sg.title))) throw err('VALIDATION');
+        const n = { ...sg, id: ++db.seq, status: 'pending', created_at: new Date().toISOString() };
+        db.suggestions.push(n);
+        const t = db.templates.find((x) => x.id === sg.template_id);
+        log(db, sg.author || 'оператор', sg.kind === 'new' ? 'Предложен шаблон' : 'Предложена правка', sg.title || (t && t.title) || '');
+        return { ok: true, id: n.id };
+      }),
+      suggestions: (token) => run((db) => {
+        auth(db, token, 'admin');
+        return clone(db.suggestions.slice().reverse().map((x) => {
+          const t = db.templates.find((y) => y.id === x.template_id);
+          return { ...x, template_title: t && t.title, template_body: t && t.body, template_keyword: t && t.keyword, template_category: t && t.category };
+        }).sort((a, b) => (a.status === 'pending' ? 0 : 1) - (b.status === 'pending' ? 0 : 1)));
+      }),
+      decideSuggestion: (token, id, accept, t) => run((db) => {
+        const s = auth(db, token, 'admin');
+        const sg = db.suggestions.find((x) => x.id === id);
+        if (!sg) throw err('NOT_FOUND');
+        if (sg.status !== 'pending') throw err('DUPLICATE');
+        let row = null;
+        if (accept) {
+          const fields = { keyword: t.keyword, title: t.title, category: t.category || null, body: t.body, body_kz: t.body_kz || null, link: t.link || null };
+          row = sg.kind === 'fix' && db.templates.find((x) => x.id === sg.template_id);
+          if (row) Object.assign(row, fields); else { row = { id: ++db.seq, ...fields }; db.templates.push(row); }
+          log(db, actor(s), sg.kind === 'fix' ? 'Шаблон изменён' : 'Шаблон добавлен', row.title);
+        }
+        Object.assign(sg, { status: accept ? 'accepted' : 'rejected', decided_at: new Date().toISOString(), decided_by: actor(s) });
+        log(db, actor(s), accept ? 'Предложение принято' : 'Предложение отклонено', (row && row.title) || sg.title || '');
+        return { ok: true, template: row ? clone(row) : null };
+      }),
+      journal: (token) => run((db) => { auth(db, token, 'owner'); return clone(db.journal.slice().reverse()); }),
       ownerSessions: (token) => run((db) => {
         const me = auth(db, token, 'owner');
         return db.sessions.filter(isActive).map((s) => ({

@@ -134,10 +134,9 @@
       box.appendChild(el);
     });
 
-    // Пятна чуть сдвигаются за мышью, глаза суфлёра следят за курсором
+    // Пятна чуть сдвигаются за мышью
     if (small) return; // на телефоне мыши нет — параллакс не нужен
     const bgMove = $('.bg-move');
-    const logos = $('.brand-logo, .gate-logo');
     let raf = 0;
     let last = null;
     window.addEventListener('pointermove', (ev) => {
@@ -151,9 +150,6 @@
           bgMove.style.setProperty('--px', (-nx * 40).toFixed(0) + 'px');
           bgMove.style.setProperty('--py', (-ny * 30).toFixed(0) + 'px');
         }
-        const lx = (nx * 2.4).toFixed(1) + 'px';
-        const ly = (ny * 1.6).toFixed(1) + 'px';
-        logos.forEach((l) => { l.style.setProperty('--lx', lx); l.style.setProperty('--ly', ly); });
       });
     }, { passive: true });
   }
@@ -215,7 +211,12 @@
     $('#btn-add-tpl').hidden = !isAdmin();
     $('#dict-guest-note').hidden = isAdmin();
     $('.tab[data-tab="owner"]').hidden = !isOwner();
+    $('.tab[data-tab="sugg"]').hidden = !isAdmin();
+    $('#btn-suggest').hidden = isAdmin();
     if (!isOwner() && state.tab === 'owner') switchTab('corrector');
+    if (!isAdmin() && state.tab === 'sugg') switchTab('corrector');
+    renderAnnouncements();
+    if (isAdmin()) loadSuggestions(true); else $('#sugg-count').textContent = '';
     updateRoleTime();
     renderDictList();
     moveInk();
@@ -410,6 +411,7 @@
 
   function switchTab(tab) {
     if (tab === 'owner' && !isOwner()) tab = 'corrector';
+    if (tab === 'sugg' && !isAdmin()) tab = 'corrector';
     state.tab = tab;
     store.set('tab', tab);
     $$('.tab').forEach((t) => {
@@ -421,7 +423,8 @@
     moveInk();
     if (tab === 'templates') setTimeout(() => $('#search').focus(), 30);
     if (tab === 'corrector') setTimeout(() => $('#draft').focus(), 30);
-    if (tab === 'owner') loadSessions();
+    if (tab === 'owner') { loadSessions(); loadJournal(); }
+    if (tab === 'sugg') loadSuggestions();
   }
 
   /* =====================================================================
@@ -643,7 +646,7 @@
 
   function setDictKind(kind) {
     state.dictKind = kind;
-    $$('.seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.kind === kind));
+    $$('#dict-modal .seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.kind === kind));
     $('#dict-desc').textContent = DICT_DESC[kind];
     $('#dict-form [name=short]').placeholder = kind === 'shortcut' ? 'прив' : 'изза';
     $('#dict-form [name=full]').placeholder = kind === 'shortcut' ? 'здравствуйте!' : 'из-за';
@@ -677,7 +680,7 @@
   }
 
   function bindDict() {
-    $$('.seg-btn').forEach((b) => b.addEventListener('click', () => setDictKind(b.dataset.kind)));
+    $$('#dict-modal .seg-btn').forEach((b) => b.addEventListener('click', () => setDictKind(b.dataset.kind)));
     $('#dict-filter').addEventListener('input', renderDictList);
 
     $('#dict-form').addEventListener('submit', async (ev) => {
@@ -1098,6 +1101,26 @@
       if (data.link && !/^https?:\/\//i.test(data.link)) data.link = 'https://' + data.link;
       const btn = $('button[type=submit]', f);
       btn.disabled = true;
+      if (f.dataset.sid) {
+        try {
+          const r = await api.decideSuggestion(state.session && state.session.token, Number(f.dataset.sid) || f.dataset.sid, true, data);
+          if (r && r.template) {
+            const row = r.template;
+            state.templates = state.templates.some((x) => String(x.id) === String(row.id))
+              ? state.templates.map((x) => (String(x.id) === String(row.id) ? row : x))
+              : [...state.templates, row];
+            store.set('templates', state.templates);
+            renderTemplates();
+          }
+          closeLayer($('#tpl-modal'));
+          toast('Предложение принято, шаблон сохранён', 'ok');
+          loadSuggestions(true);
+        } catch (e) {
+          if (!handleSessionError(e)) msg.textContent = e.code === 'DUPLICATE' ? 'Это предложение уже решил другой админ.' : e.code === 'NETWORK' ? 'Нет связи с базой.' : 'Не получилось сохранить. Проверьте поля.';
+        }
+        btn.disabled = false;
+        return;
+      }
       try {
         const row = await api.saveTemplate(state.session && state.session.token, data);
         if (data.id) state.templates = state.templates.map((x) => (String(x.id) === String(row.id) ? row : x));
@@ -1137,6 +1160,7 @@
       link.removeAttribute('href');
     }
     $$('#drawer [data-admin]').forEach((el) => { el.hidden = !isAdmin(); });
+    $('#d-suggest').hidden = isAdmin();
     openLayer($('#drawer'));
     setTimeout(() => $('#d-copy').focus(), 60);
   }
@@ -1146,6 +1170,7 @@
     const f = $('#tpl-form');
     f.reset();
     f.dataset.id = t ? t.id : '';
+    f.dataset.sid = '';
     $('#tpl-form-title').textContent = t ? 'Редактировать шаблон' : 'Новый шаблон';
     $('#tpl-form-msg').textContent = '';
     const cats = [...new Set([...CAT_ORDER, ...state.templates.map((x) => x.category).filter(Boolean)])];
@@ -1314,6 +1339,334 @@
   }
 
   /* =====================================================================
+   *  Объявления о массовых сбоях (видят все, публикуют админ и владелец)
+   * ===================================================================== */
+
+  let annList = [];
+  const annHidden = () => store.get('annHidden', []);
+  const hoursWord = (n) => {
+    const m10 = n % 10;
+    const m100 = n % 100;
+    if (m10 === 1 && m100 !== 11) return n + ' час';
+    if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return n + ' часа';
+    return n + ' часов';
+  };
+  function fmtUntil(iso) {
+    const d = new Date(iso);
+    const t = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    return d.toDateString() === new Date().toDateString() ? 'до ' + t : 'до ' + d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }) + ', ' + t;
+  }
+  const fmtWhen = (iso) => new Date(iso).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+  async function loadAnnouncements() {
+    try { annList = await api.announcements(); } catch (e) { return; }
+    const ids = annList.map((a) => a.id);
+    store.set('annHidden', annHidden().filter((id) => ids.includes(id)));
+    renderAnnouncements();
+  }
+
+  function renderAnnouncements() {
+    const now = Date.now();
+    annList = annList.filter((a) => new Date(a.expires_at).getTime() > now);
+    const hidden = annHidden();
+    const shown = annList.filter((a) => !hidden.includes(a.id));
+    const bar = $('#ann-bar');
+    bar.hidden = !shown.length;
+    bar.innerHTML = shown.map((a) => `
+      <div class="ann" data-id="${esc(a.id)}">
+        <svg class="ann-ico"><use href="#i-megaphone"/></svg>
+        <div class="ann-text">${esc(a.body)}<span class="ann-meta">${esc(fmtUntil(a.expires_at))}${a.author ? ' · ' + esc(a.author) : ''}</span></div>
+        ${isAdmin() ? '<button class="ann-end" type="button" data-end>Снять</button>' : ''}
+        <button class="ann-hide" type="button" data-hide title="Скрыть у себя" aria-label="Скрыть"><svg><use href="#i-close"/></svg></button>
+      </div>`).join('');
+    const nHidden = annList.length - shown.length;
+    $('#ann-pill').hidden = !nHidden;
+    $('#ann-pill-n').textContent = nHidden > 1 ? String(nHidden) : '';
+    $('#ann-active').innerHTML = annList.length && isAdmin()
+      ? '<h3>Сейчас висят</h3>' + annList.map((a) => `
+          <div class="ann-row" data-id="${esc(a.id)}"><span>${esc(a.body)}<small>${esc(fmtUntil(a.expires_at))}${a.author ? ' · ' + esc(a.author) : ''}</small></span>
+          <button class="btn danger" type="button" data-end>Снять</button></div>`).join('')
+      : '';
+  }
+
+  async function endAnnouncement(id) {
+    const ok = await confirmBox('Снять объявление?', 'Оно пропадёт у всех.', 'Снять');
+    if (!ok) return;
+    try {
+      await api.announceEnd(state.session && state.session.token, Number(id) || id);
+      annList = annList.filter((a) => String(a.id) !== String(id));
+      renderAnnouncements();
+      toast('Объявление снято', 'ok');
+    } catch (e) {
+      if (!handleSessionError(e)) toast('Не получилось снять. Попробуйте ещё раз.', 'warn');
+    }
+  }
+
+  function annHoursChanged() {
+    const f = $('#ann-form');
+    const h = Number(f.elements.hours.value);
+    $('#ann-hours-val').textContent = hoursWord(h);
+    $('#ann-until').textContent = 'Пропадёт ' + fmtUntil(new Date(Date.now() + h * 3600 * 1000).toISOString()) + '.';
+    $$('#ann-quick button').forEach((b) => b.classList.toggle('active', Number(b.dataset.h) === h));
+  }
+
+  /* =====================================================================
+   *  Предложения шаблонов от операторов
+   * ===================================================================== */
+
+  let suggList = [];
+  let suggFilter = 'pending';
+
+  function openSuggest(t) {
+    const f = $('#sug-form');
+    f.reset();
+    f.dataset.kind = t ? 'fix' : 'new';
+    f.dataset.tid = t ? t.id : '';
+    $('#sug-form-title').textContent = t ? 'Предложить правку' : 'Предложить шаблон';
+    $('#sug-form-desc').textContent = t ? `Шаблон «${t.title}». Исправьте текст как нужно — админ посмотрит и применит.` : 'Админы посмотрят и добавят шаблон, если он подходит.';
+    $$('#sug-form [data-new]').forEach((el) => { el.hidden = !!t; });
+    $('#sug-msg').textContent = '';
+    if (t) f.elements.body.value = t.body;
+    f.elements.author.value = state.opName || store.get('sugAuthor', '');
+    const cats = [...new Set([...CAT_ORDER, ...state.templates.map((x) => x.category).filter(Boolean)])];
+    $('#cat-list').innerHTML = cats.map((c) => `<option value="${esc(c)}">`).join('');
+    openLayer($('#sug-modal'));
+    setTimeout(() => (t ? f.elements.body : f.elements.keyword).focus(), 50);
+  }
+
+  async function loadSuggestions(quiet) {
+    if (!isAdmin()) return;
+    try {
+      suggList = await api.suggestions(state.session.token);
+    } catch (e) {
+      if (!handleSessionError(e) && !quiet) toast('Не получилось загрузить предложения', 'warn');
+      return;
+    }
+    const pending = suggList.filter((s) => s.status === 'pending').length;
+    $('#sugg-count').textContent = pending || '';
+    renderSuggestions();
+  }
+
+  function renderSuggestions() {
+    const list = suggList.filter((s) => (suggFilter === 'pending' ? s.status === 'pending' : s.status !== 'pending'));
+    $$('#sugg-filter .seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.f === suggFilter));
+    $('#sugg-list').innerHTML = list.map((s) => {
+      const isFix = s.kind === 'fix';
+      const title = isFix ? (s.template_title || 'шаблон удалён') : s.title;
+      const who = s.author ? esc(s.author) : 'оператора';
+      const status = s.status === 'pending' ? '' : `<p class="sug-status ${s.status === 'accepted' ? 'ok' : 'no'}">${s.status === 'accepted' ? 'Принято' : 'Отклонено'} · ${esc(s.decided_by || '')} · ${esc(fmtWhen(s.decided_at))}</p>`;
+      return `
+        <article class="sug-card" data-id="${esc(s.id)}">
+          <div class="sug-head">
+            <span class="sug-kind ${isFix ? 'fix' : 'new'}">${isFix ? 'Правка' : 'Новый шаблон'}</span>
+            <b>${esc(title)}</b>
+            <span class="sug-from">от ${who} · ${esc(fmtWhen(s.created_at))}</span>
+          </div>
+          ${!isFix ? `<p class="sug-meta">Ключи: ${esc(s.keyword || '')}${s.category ? ' · тема: ' + esc(s.category) : ''}</p>` : ''}
+          ${isFix && s.template_body ? `<details class="sug-old"><summary>Сейчас в шаблоне</summary><div class="sug-text">${esc(s.template_body)}</div></details>` : ''}
+          <div class="sug-text">${esc(s.body)}</div>
+          ${s.note ? `<p class="sug-note">«${esc(s.note)}»</p>` : ''}
+          ${s.status === 'pending' ? `<div class="sug-actions">
+            <button class="btn btn-green" type="button" data-act="accept"${isFix && !s.template_title ? ' disabled' : ''}>${isFix ? 'Открыть и применить' : 'Открыть и добавить'}</button>
+            <button class="btn ghost" type="button" data-act="reject">Отклонить</button></div>` : status}
+        </article>`;
+    }).join('');
+    const empty = $('#sugg-empty');
+    empty.hidden = !!list.length;
+    empty.innerHTML = suggFilter === 'pending' ? '<b>Новых предложений нет</b>Операторы предлагают шаблоны кнопкой «Предложить шаблон» во вкладке «Шаблоны».' : '<b>Пока ничего не решали</b>';
+  }
+
+  // «Открыть и добавить»: форма шаблона, заполненная предложением; сохранение = принять предложение
+  function acceptSuggestion(s) {
+    const base = s.kind === 'fix' ? findTpl(s.template_id) : null;
+    openTplForm(base || null);
+    const f = $('#tpl-form');
+    f.dataset.sid = s.id;
+    $('#tpl-form-title').textContent = s.kind === 'fix' ? 'Применить правку' : 'Добавить предложенный шаблон';
+    if (s.kind === 'fix') {
+      f.elements.keyword.value = base ? base.keyword : (s.template_keyword || '');
+      f.elements.title.value = base ? base.title : (s.template_title || '');
+      f.elements.category.value = base ? base.category || '' : (s.template_category || '');
+    } else {
+      f.elements.keyword.value = s.keyword || '';
+      f.elements.title.value = s.title || '';
+      f.elements.category.value = s.category || '';
+    }
+    f.elements.body.value = s.body;
+  }
+
+  async function rejectSuggestion(s) {
+    const ok = await confirmBox('Отклонить предложение?', s.author ? `Предложение от ${s.author} уйдёт в «Решённые».` : 'Предложение уйдёт в «Решённые».', 'Отклонить');
+    if (!ok) return;
+    try {
+      await api.decideSuggestion(state.session.token, s.id, false);
+      toast('Предложение отклонено');
+      loadSuggestions();
+    } catch (e) {
+      if (!handleSessionError(e)) toast(e.code === 'DUPLICATE' ? 'Его уже решил другой админ' : 'Не получилось. Попробуйте ещё раз.', 'warn');
+      loadSuggestions(true);
+    }
+  }
+
+  /* =====================================================================
+   *  Журнал изменений (владелец)
+   * ===================================================================== */
+
+  let journalRows = [];
+  async function loadJournal() {
+    if (!isOwner()) return;
+    try {
+      journalRows = await api.journal(state.session.token);
+    } catch (e) {
+      if (!handleSessionError(e)) $('#journal-list').innerHTML = '<p class="muted small">Не получилось загрузить журнал.</p>';
+      return;
+    }
+    renderJournal();
+  }
+  function renderJournal() {
+    const q = norm($('#journal-filter').value.trim());
+    const rows = q ? journalRows.filter((j) => norm(j.actor + ' ' + j.action + ' ' + j.details).includes(q)) : journalRows;
+    $('#journal-list').innerHTML = rows.length
+      ? rows.slice(0, 400).map((j) => `
+          <div class="j-row">
+            <time>${esc(fmtWhen(j.at))}</time>
+            <b class="j-who">${esc(j.actor)}</b>
+            <span class="j-act ${/удал|отклон|снят/i.test(j.action) ? 'neg' : /добав|принят|Объявление$/i.test(j.action) ? 'pos' : ''}">${esc(j.action)}</span>
+            <span class="j-det">${esc(j.details)}</span>
+          </div>`).join('')
+      : '<p class="muted small">Записей нет.</p>';
+  }
+
+  function bindTeam() {
+    // объявления
+    $('#btn-announce').addEventListener('click', () => {
+      const f = $('#ann-form');
+      f.reset();
+      $('#ann-msg').textContent = '';
+      annHoursChanged();
+      renderAnnouncements();
+      openLayer($('#ann-modal'));
+      setTimeout(() => f.elements.body.focus(), 50);
+    });
+    $('#ann-form').elements.hours.addEventListener('input', annHoursChanged);
+    $('#ann-quick').addEventListener('click', (ev) => {
+      const b = ev.target.closest('button[data-h]');
+      if (!b) return;
+      $('#ann-form').elements.hours.value = b.dataset.h;
+      annHoursChanged();
+    });
+    $('#ann-form').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const f = ev.target;
+      const body = f.elements.body.value.trim();
+      const hours = Number(f.elements.hours.value);
+      if (!body) { $('#ann-msg').textContent = 'Напишите текст объявления.'; return; }
+      const btn = $('button[type=submit]', f);
+      btn.disabled = true;
+      try {
+        const a = await api.announce(state.session && state.session.token, body, hours);
+        annList = [a, ...annList];
+        store.set('annHidden', annHidden().filter((id) => id !== a.id));
+        renderAnnouncements();
+        closeLayer($('#ann-modal'));
+        toast(`Объявление опубликовано на ${hoursWord(hours)}`, 'ok');
+      } catch (e) {
+        if (!handleSessionError(e)) $('#ann-msg').textContent = e.code === 'NETWORK' ? 'Нет связи с базой.' : 'Не получилось опубликовать.';
+        else closeLayer($('#ann-modal'));
+      }
+      btn.disabled = false;
+    });
+    $('#ann-bar').addEventListener('click', (ev) => {
+      const row = ev.target.closest('.ann');
+      if (!row) return;
+      if (ev.target.closest('[data-hide]')) {
+        store.set('annHidden', [...new Set([...annHidden(), Number(row.dataset.id) || row.dataset.id])]);
+        renderAnnouncements();
+      } else if (ev.target.closest('[data-end]')) {
+        endAnnouncement(row.dataset.id);
+      }
+    });
+    $('#ann-active').addEventListener('click', (ev) => {
+      const b = ev.target.closest('[data-end]');
+      if (b) endAnnouncement(b.closest('.ann-row').dataset.id);
+    });
+    $('#ann-pill').addEventListener('click', () => {
+      store.set('annHidden', []);
+      renderAnnouncements();
+    });
+    setInterval(() => { if (!document.hidden) loadAnnouncements(); }, 60000);
+    setInterval(renderAnnouncements, 30000); // убрать истёкшие без запроса
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) loadAnnouncements(); });
+
+    // предложения
+    $('#btn-suggest').addEventListener('click', () => openSuggest(null));
+    $('#d-suggest').addEventListener('click', () => {
+      const t = findTpl(state.openTemplateId);
+      closeLayer($('#drawer'));
+      if (t) openSuggest(t);
+    });
+    $('#sug-form').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const f = ev.target;
+      const kind = f.dataset.kind;
+      const data = {
+        kind,
+        template_id: kind === 'fix' ? Number(f.dataset.tid) || f.dataset.tid : null,
+        keyword: f.elements.keyword.value.trim(),
+        title: f.elements.title.value.trim(),
+        category: f.elements.category.value.trim(),
+        body: f.elements.body.value.trim(),
+        note: f.elements.note.value.trim(),
+        author: f.elements.author.value.trim(),
+      };
+      const msg = $('#sug-msg');
+      msg.textContent = '';
+      if (!data.body || (kind === 'new' && (!data.keyword || !data.title))) {
+        msg.textContent = kind === 'new' ? 'Нужны ключевые слова, название и текст.' : 'Напишите исправленный текст.';
+        return;
+      }
+      if (kind === 'fix') {
+        const t = findTpl(data.template_id);
+        if (t && t.body.trim() === data.body && !data.note) { msg.textContent = 'Текст не изменился — поправьте его или напишите комментарий.'; return; }
+      }
+      if (data.author) store.set('sugAuthor', data.author);
+      const btn = $('button[type=submit]', f);
+      btn.disabled = true;
+      try {
+        await api.suggest(data);
+        closeLayer($('#sug-modal'));
+        toast('Спасибо! Админы посмотрят предложение', 'ok');
+        if (isAdmin()) loadSuggestions(true);
+      } catch (e) {
+        msg.textContent = e.code === 'TOO_MANY' ? 'Слишком много предложений подряд. Попробуйте через час.'
+          : e.code === 'NETWORK' ? 'Нет связи с базой.' : 'Не получилось отправить. Проверьте поля.';
+      }
+      btn.disabled = false;
+    });
+    $('#sugg-filter').addEventListener('click', (ev) => {
+      const b = ev.target.closest('.seg-btn');
+      if (!b) return;
+      suggFilter = b.dataset.f;
+      renderSuggestions();
+    });
+    $('#btn-sugg-refresh').addEventListener('click', () => loadSuggestions());
+    $('#sugg-list').addEventListener('click', (ev) => {
+      const b = ev.target.closest('[data-act]');
+      if (!b) return;
+      const s = suggList.find((x) => String(x.id) === b.closest('.sug-card').dataset.id);
+      if (!s) return;
+      if (b.dataset.act === 'accept') acceptSuggestion(s);
+      else rejectSuggestion(s);
+    });
+    setInterval(() => { if (isAdmin() && !document.hidden) loadSuggestions(true); }, 120000);
+
+    // журнал
+    $('#btn-journal-refresh').addEventListener('click', loadJournal);
+    let jt = 0;
+    $('#journal-filter').addEventListener('input', () => { clearTimeout(jt); jt = setTimeout(renderJournal, 150); });
+  }
+
+  /* =====================================================================
    *  Слои: модальные окна и выезжающая панель
    * ===================================================================== */
 
@@ -1440,6 +1793,7 @@
     bindTemplates();
     bindFlow();
     bindOwner();
+    bindTeam();
     bindLayers();
     bindGlobal();
 
@@ -1463,6 +1817,7 @@
 
     loadEntries();
     loadTemplates();
+    loadAnnouncements();
   }
 
   init();

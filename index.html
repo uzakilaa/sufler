@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=11">
+  <link rel="stylesheet" href="css/style.css?v=13">
 </head>
 <body>
   <!-- Фон рисуется кодом: пятна плывут, поверх лёгкое зерно -->
@@ -47,6 +47,7 @@
     <symbol id="i-doc" viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 12h5M10 15.5h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
     <symbol id="i-loop" viewBox="0 0 24 24"><path d="M19 8a7.5 7.5 0 0 0-13.5 1M5 16a7.5 7.5 0 0 0 13.5-1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M19 3.5V8h-4.5M5 20.5V16h4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 5 6v5.5c0 4.5 3 8 7 9.5 4-1.5 7-5 7-9.5V6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m9 12 2.2 2.2L15.5 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-megaphone" viewBox="0 0 24 24"><path d="M4 10v4a1 1 0 0 0 1 1h2l6 4V5L7 9H5a1 1 0 0 0-1 1z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
     <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5zM4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
   </svg>
 
@@ -96,6 +97,8 @@
         </div>
       </div>
       <div class="who">
+        <button class="btn top-btn ann-pill" id="ann-pill" type="button" hidden title="Показать скрытые объявления"><svg class="ico"><use href="#i-megaphone"/></svg>Объявление<span class="ann-pill-n" id="ann-pill-n"></span></button>
+        <button class="btn top-btn" id="btn-announce" type="button" data-admin hidden><svg class="ico"><use href="#i-megaphone"/></svg>Сообщить всем</button>
         <div class="role-pill" id="role-pill">
           <span class="role-dot"></span>
           <span id="role-name">Гость</span>
@@ -107,11 +110,13 @@
     </header>
 
     <div class="demo-banner" id="demo-banner" hidden></div>
+    <div class="ann-bar" id="ann-bar" hidden aria-live="polite"></div>
 
     <nav class="tabs" role="tablist">
       <span class="tab-ink" id="tab-ink"></span>
       <button class="tab" role="tab" data-tab="corrector" type="button">Корректор</button>
       <button class="tab" role="tab" data-tab="templates" type="button">Шаблоны <span class="tab-count" id="tab-count"></span></button>
+      <button class="tab" role="tab" data-tab="sugg" type="button" hidden>Предложения <span class="tab-count" id="sugg-count"></span></button>
       <button class="tab" role="tab" data-tab="owner" type="button" hidden>Сессии</button>
     </nav>
 
@@ -182,11 +187,26 @@
           </div>
           <span class="tpl-count" id="tpl-count"></span>
           <button class="btn btn-green" id="btn-add-tpl" type="button" hidden>+ Добавить шаблон</button>
+          <button class="btn ghost" id="btn-suggest" type="button">Предложить шаблон</button>
         </div>
         <div class="cat-chips" id="cat-chips" hidden></div>
         <p class="tpl-help">Клик — скопировать. Двойной клик или «Детали» — открыть целиком. Номер, сумму, карту или банк можно дописать прямо в поиск: <i>идентиф +7 706 000 0000</i>, <i>пт бцк</i>, <i>вал поступил 5000</i> — они встанут в текст.</p>
         <div class="tpl-list" id="tpl-list"></div>
         <div class="empty" id="tpl-empty" hidden></div>
+      </section>
+
+      <!-- ===== Предложения операторов (админ и владелец) ===== -->
+      <section class="view" id="view-sugg" data-view="sugg" hidden>
+        <div class="sugg-bar">
+          <h2>Предложения операторов</h2>
+          <div class="seg" id="sugg-filter" role="group">
+            <button class="seg-btn active" data-f="pending" type="button">Ждут решения</button>
+            <button class="seg-btn" data-f="done" type="button">Решённые</button>
+          </div>
+          <button class="btn ghost" id="btn-sugg-refresh" type="button">Обновить</button>
+        </div>
+        <div class="sugg-list" id="sugg-list"></div>
+        <div class="empty" id="sugg-empty" hidden></div>
       </section>
 
       <!-- ===== Панель владельца ===== -->
@@ -227,9 +247,14 @@
             <p class="import-preview" id="import-preview"></p>
             <button class="btn btn-green" id="btn-import" type="button" disabled>Импортировать</button>
           </div>
-          <div class="card card-soon">
-            <h2>Управление кодами</h2>
-            <p class="muted small">Добавление и удаление кодов, смена лимита входов — во втором этапе. Пока коды добавляются в Supabase (см. README).</p>
+          <div class="card journal-card">
+            <div class="card-head">
+              <h2>Журнал изменений</h2>
+              <input class="journal-filter" id="journal-filter" type="search" placeholder="Фильтр: кто, что, шаблон" autocomplete="off">
+              <button class="btn ghost" id="btn-journal-refresh" type="button">Обновить</button>
+            </div>
+            <p class="muted small">Кто добавлял и менял шаблоны и словарь, кто публиковал объявления, кто что предлагал и какие предложения приняли или отклонили. Админы видны по названию кода («Админ», «Админ 2»), операторы — по имени, которое они указали.</p>
+            <div class="journal" id="journal-list"></div>
           </div>
         </div>
       </section>
@@ -261,6 +286,7 @@
         <button class="btn btn-copy" id="d-copy" type="button"><svg class="ico"><use href="#i-copy"/></svg><span id="d-copy-label">Копировать</span></button>
         <button class="btn btn-copy" id="d-copy-kz" type="button" hidden><svg class="ico"><use href="#i-copy"/></svg>Копировать ҚАЗ</button>
         <span class="spacer"></span>
+        <button class="btn ghost" id="d-suggest" type="button">Предложить правку</button>
         <button class="btn btn-green" id="d-edit" type="button" data-admin hidden>Редактировать</button>
         <button class="btn danger" id="d-delete" type="button" data-admin hidden>Удалить</button>
       </div>
@@ -286,6 +312,54 @@
       <div class="modal-actions">
         <button class="btn ghost" type="button" data-close>Отмена</button>
         <button class="btn btn-green" type="submit">Сохранить</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="modal-wrap" id="ann-modal" hidden>
+    <div class="scrim" data-close></div>
+    <form class="modal" id="ann-form" autocomplete="off">
+      <button class="icon-btn modal-close" data-close type="button" aria-label="Закрыть"><svg><use href="#i-close"/></svg></button>
+      <h2>Объявление для всех</h2>
+      <p class="muted small">Появится сверху у всех, кто открыл Суфлёр. Каждый может скрыть его у себя и открыть снова кнопкой «Объявление» в шапке.</p>
+      <label>Текст <b>*</b><textarea name="body" rows="4" maxlength="1000" required placeholder="Массовый сбой: переводы на Kaspi не проходят. Отвечаем шаблоном «санкц». Обновим, как починят."></textarea></label>
+      <div class="ann-hours">
+        <span>Показывать</span>
+        <input type="range" name="hours" min="1" max="48" step="1" value="4" aria-label="Сколько часов показывать">
+        <b id="ann-hours-val">4 часа</b>
+      </div>
+      <div class="ann-quick" id="ann-quick">
+        <button type="button" data-h="1">1 ч</button><button type="button" data-h="2">2 ч</button><button type="button" data-h="4">4 ч</button>
+        <button type="button" data-h="8">8 ч</button><button type="button" data-h="12">12 ч</button><button type="button" data-h="24">сутки</button><button type="button" data-h="48">двое суток</button>
+      </div>
+      <p class="muted small" id="ann-until"></p>
+      <p class="form-msg" id="ann-msg" role="alert"></p>
+      <div class="modal-actions">
+        <button class="btn ghost" type="button" data-close>Отмена</button>
+        <button class="btn btn-green" type="submit">Опубликовать</button>
+      </div>
+      <div class="ann-active" id="ann-active"></div>
+    </form>
+  </div>
+
+  <div class="modal-wrap" id="sug-modal" hidden>
+    <div class="scrim" data-close></div>
+    <form class="modal" id="sug-form" autocomplete="off">
+      <button class="icon-btn modal-close" data-close type="button" aria-label="Закрыть"><svg><use href="#i-close"/></svg></button>
+      <h2 id="sug-form-title">Предложить шаблон</h2>
+      <p class="muted small" id="sug-form-desc">Админы посмотрят и добавят шаблон, если он подходит.</p>
+      <div class="form-row two" data-new>
+        <label>Ключевые слова <b>*</b><input name="keyword" maxlength="300" placeholder="деп, депозит"></label>
+        <label>Название <b>*</b><input name="title" maxlength="200" placeholder="Депозит в процессе открытия"></label>
+      </div>
+      <label data-new>Тема<input name="category" maxlength="60" list="cat-list" placeholder="Кредиты, Карты…"></label>
+      <label>Текст <b>*</b><textarea name="body" rows="7" maxlength="10000" required placeholder="Текст ответа клиенту"></textarea></label>
+      <label>Комментарий<input name="note" maxlength="1000" placeholder="Что исправить или зачем нужен шаблон"></label>
+      <label>Ваше имя<input name="author" maxlength="60" placeholder="Чтобы админ знал, от кого"></label>
+      <p class="form-msg" id="sug-msg" role="alert"></p>
+      <div class="modal-actions">
+        <button class="btn ghost" type="button" data-close>Отмена</button>
+        <button class="btn btn-green" type="submit">Отправить</button>
       </div>
     </form>
   </div>
@@ -327,16 +401,16 @@
 
   <div class="toasts" id="toasts" aria-live="polite"></div>
 
-  <script src="js/config.js?v=11"></script>
-  <script src="js/vocab.js?v=11"></script>
-  <script src="js/words.js?v=11"></script>
-  <script src="js/speller.js?v=11"></script>
-  <script src="js/corrector.js?v=11"></script>
-  <script src="js/tones.js?v=11"></script>
-  <script src="js/fill.js?v=11"></script>
-  <script src="js/api.js?v=11"></script>
-  <script src="js/mock-backend.js?v=11"></script>
-  <script src="js/pets.js?v=11"></script>
-  <script src="js/app.js?v=11"></script>
+  <script src="js/config.js?v=13"></script>
+  <script src="js/vocab.js?v=13"></script>
+  <script src="js/words.js?v=13"></script>
+  <script src="js/speller.js?v=13"></script>
+  <script src="js/corrector.js?v=13"></script>
+  <script src="js/tones.js?v=13"></script>
+  <script src="js/fill.js?v=13"></script>
+  <script src="js/api.js?v=13"></script>
+  <script src="js/mock-backend.js?v=13"></script>
+  <script src="js/pets.js?v=13"></script>
+  <script src="js/app.js?v=13"></script>
 </body>
 </html>
