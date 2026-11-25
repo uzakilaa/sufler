@@ -209,7 +209,7 @@
 
   function renderRole() {
     const role = state.role || 'guest';
-    $('#role-name').textContent = ROLE_NAMES[role] + (role !== 'guest' && state.session && state.session.person ? ' · ' + state.session.person : '');
+    $('#role-name').textContent = ROLE_NAMES[role];
     $('#role-pill').classList.toggle('admin', role !== 'guest');
     $('#btn-logout').hidden = role === 'guest';
     $$('[data-admin]').forEach((el) => { el.hidden = !isAdmin(); });
@@ -358,7 +358,6 @@
       $('#gate-choices').hidden = true;
       $('#code-form').hidden = false;
       $('#code-input').value = '';
-      $('#code-name').value = store.get('person', '') || state.opName || '';
       setTimeout(() => $('#code-input').focus(), 30);
     }));
 
@@ -380,11 +379,9 @@
       try {
         const r = await api.login(code, device);
         if (r.ok) {
-          const person = $('#code-name').value.replace(/\s+/g, ' ').trim().slice(0, 40);
-          store.set('person', person);
-          setRole(r.role, { token: r.token, role: r.role, expires_at: r.expires_at, session_id: r.session_id, person });
-          // имя — для журнала («Админ 2 · Айдана»); если не вышло, вход всё равно состоялся
-          if (person) api.setSessionName(r.token, person).catch(() => {});
+          // кто вошёл, владелец видит по названию кода (его даёт владелец), имя вводить не нужно
+          store.del('person');
+          setRole(r.role, { token: r.token, role: r.role, expires_at: r.expires_at, session_id: r.session_id });
           lastCheck = Date.now();
           hideGate();
           toast(r.role === 'owner' ? 'С возвращением, владелец. Всё под контролем.' : 'Вы вошли как админ. Шаблоны в вашей власти.', 'ok');
