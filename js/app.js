@@ -173,6 +173,7 @@
   async function copyText(text) {
     try {
       await navigator.clipboard.writeText(text);
+      document.dispatchEvent(new CustomEvent('sufler:copied'));
       return true;
     } catch (e) {
       const ta = document.createElement('textarea');
@@ -185,6 +186,7 @@
       try { ok = document.execCommand('copy'); } catch (e2) { ok = false; }
       ta.remove();
       if (!ok) toast('Браузер не дал скопировать. Выделите текст и нажмите Ctrl+C', 'warn');
+      else document.dispatchEvent(new CustomEvent('sufler:copied'));
       return ok;
     }
   }
@@ -215,6 +217,7 @@
     updateRoleTime();
     renderDictList();
     moveInk();
+    if (window.SuflerPets) window.SuflerPets.setRole(role);
   }
 
   function updateRoleTime() {
@@ -1409,6 +1412,13 @@
 
   function init() {
     startBackground();
+    if (window.SuflerPets) {
+      window.SuflerPets.init();
+      const pt = $('#pets-toggle');
+      const label = () => { pt.textContent = 'Питомцы: ' + (window.SuflerPets.enabled() ? 'вкл' : 'выкл'); };
+      label();
+      pt.addEventListener('click', () => { window.SuflerPets.toggle(); label(); });
+    }
     const slogan = SLOGANS[Math.floor(Math.random() * SLOGANS.length)];
     $$('[data-slogan]').forEach((el) => { el.textContent = `«${slogan}»`; });
 
