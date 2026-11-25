@@ -133,6 +133,8 @@ begin
   if p_min_role = 'owner' and s.role <> 'owner' then
     raise exception 'FORBIDDEN';
   end if;
+  -- кто действует — для журнала изменений (до конца текущего запроса)
+  perform set_config('sufler.actor', coalesce((select label from public.access_codes where id = s.code_id), s.role), true);
   return s;
 end;
 $$;
@@ -442,6 +444,278 @@ begin
 end;
 $$;
 
+-- ---------- Объявления, предложения шаблонов, журнал изменений ----------
+
+-- Объявление о массовом сбое: видно всем на сайте до expires_at (от 1 до 48 часов).
+create table if not exists public.announcements (
+  id          bigint generated always as identity primary key,
+  body        text not null check (length(trim(body)) between 1 and 1000),
+  author      text not null default '',
+  created_at  timestamptz not null default now(),
+  expires_at  timestamptz not null,
+  ended_at    timestamptz,
+  ended_by    text
+);
+
+-- Предложения от операторов: новый шаблон (new) или правка существующего (fix).
+create table if not exists public.suggestions (
+  id           bigint generated always as identity primary key,
+  kind         text not null check (kind in ('new', 'fix')),
+  template_id  bigint references public.templates(id) on delete set null,
+  keyword      text check (keyword is null or length(keyword) <= 300),
+  title        text check (title is null or length(title) <= 200),
+  category     text check (category is null or length(category) <= 60),
+  body         text not null check (length(trim(body)) between 1 and 10000),
+  note         text check (note is null or length(note) <= 1000),
+  author       text not null default '' check (length(author) <= 60),
+  ip_hash      text,
+  status       text not null default 'pending' check (status in ('pending', 'accepted', 'rejected')),
+  created_at   timestamptz not null default now(),
+  decided_at   timestamptz,
+  decided_by   text
+);
+create index if not exists suggestions_status_idx on public.suggestions (status, created_at desc);
+
+-- Журнал: кто и что менял. Видит только владелец.
+create table if not exists public.journal (
+  id       bigint generated always as identity primary key,
+  at       timestamptz not null default now(),
+  actor    text not null,
+  action   text not null,
+  details  text not null default ''
+);
+create index if not exists journal_at_idx on public.journal (at desc);
+
+alter table public.announcements enable row level security;
+alter table public.suggestions   enable row level security;
+alter table public.journal       enable row level security;
+revoke all on public.announcements, public.suggestions, public.journal from anon, authenticated;
+
+-- Кто сейчас действует: метку кода ставит _auth на время запроса.
+create or replace function public._actor()
+returns text language sql stable
+as $$ select coalesce(nullif(current_setting('sufler.actor', true), ''), 'база (SQL)') $$;
+
+create or replace function public._log(p_action text, p_details text default '')
+returns void language sql security definer
+set search_path = public, extensions
+as $$ insert into public.journal (actor, action, details) values (public._actor(), p_action, left(coalesce(p_details, ''), 500)) $$;
+
+-- Изменения шаблонов и словаря пишутся в журнал автоматически
+create or replace function public._journal_templates()
+returns trigger language plpgsql security definer
+set search_path = public, extensions
+as $$
+begin
+  if tg_op = 'INSERT' then
+    perform public._log('Шаблон добавлен', new.title || ' · ' || split_part(new.keyword, ',', 1));
+  elsif tg_op = 'UPDATE' then
+    perform public._log('Шаблон изменён', new.title || ' · ' || split_part(new.keyword, ',', 1));
+  else
+    perform public._log('Шаблон удалён', old.title || ' · ' || split_part(old.keyword, ',', 1));
+  end if;
+  return null;
+end;
+$$;
+drop trigger if exists templates_journal on public.templates;
+create trigger templates_journal after insert or update or delete on public.templates
+  for each row execute function public._journal_templates();
+
+create or replace function public._journal_shortcuts()
+returns trigger language plpgsql security definer
+set search_path = public, extensions
+as $$
+declare
+  w text := case coalesce(new.kind, old.kind) when 'typo' then 'Словарь опечаток' else 'Сокращения' end;
+begin
+  if tg_op = 'INSERT' then
+    perform public._log(w || ': добавлено', new.short || ' → ' || new.full_text);
+  elsif tg_op = 'UPDATE' then
+    perform public._log(w || ': изменено', new.short || ' → ' || new.full_text);
+  else
+    perform public._log(w || ': удалено', old.short || ' → ' || old.full_text);
+  end if;
+  return null;
+end;
+$$;
+drop trigger if exists shortcuts_journal on public.shortcuts;
+create trigger shortcuts_journal after insert or update or delete on public.shortcuts
+  for each row execute function public._journal_shortcuts();
+
+-- Объявления: читать может кто угодно (только действующие)
+create or replace function public.announcements_active()
+returns json
+language sql stable security definer
+set search_path = public, extensions
+as $$
+  select coalesce(json_agg(json_build_object('id', id, 'body', body, 'author', author,
+                                             'created_at', created_at, 'expires_at', expires_at)
+                           order by created_at desc), '[]'::json)
+    from public.announcements
+   where ended_at is null and expires_at > now()
+$$;
+
+create or replace function public.announce_create(p_token text, p_body text, p_hours int)
+returns json
+language plpgsql security definer
+set search_path = public, extensions
+as $$
+declare
+  a public.announcements;
+begin
+  perform public._auth(p_token, 'admin');
+  if coalesce(trim(p_body), '') = '' or length(p_body) > 1000 or p_hours is null or p_hours < 1 or p_hours > 48 then
+    raise exception 'VALIDATION';
+  end if;
+  insert into public.announcements (body, author, expires_at)
+  values (trim(p_body), public._actor(), now() + make_interval(hours => p_hours))
+  returning * into a;
+  perform public._log('Объявление', trim(p_body) || ' · на ' || p_hours || ' ч');
+  return row_to_json(a);
+end;
+$$;
+
+create or replace function public.announce_end(p_token text, p_id bigint)
+returns json
+language plpgsql security definer
+set search_path = public, extensions
+as $$
+declare
+  a public.announcements;
+begin
+  perform public._auth(p_token, 'admin');
+  update public.announcements set ended_at = now(), ended_by = public._actor()
+   where id = p_id and ended_at is null
+  returning * into a;
+  if found then perform public._log('Объявление снято', a.body); end if;
+  return json_build_object('ok', true);
+end;
+$$;
+
+-- Предложение шаблона: может отправить кто угодно (с ограничением частоты)
+create or replace function public.suggestion_create(
+  p_kind text, p_template_id bigint, p_keyword text, p_title text, p_category text,
+  p_body text, p_note text, p_author text)
+returns json
+language plpgsql security definer
+set search_path = public, extensions
+as $$
+declare
+  v_ip text := encode(digest(coalesce(public._client_ip(), 'unknown'), 'sha256'), 'hex');
+  v_author text := left(trim(coalesce(p_author, '')), 60);
+  sg public.suggestions;
+begin
+  if p_kind not in ('new', 'fix') or coalesce(trim(p_body), '') = '' then
+    raise exception 'VALIDATION';
+  end if;
+  if p_kind = 'new' and (coalesce(trim(p_keyword), '') = '' or coalesce(trim(p_title), '') = '') then
+    raise exception 'VALIDATION';
+  end if;
+  if p_kind = 'fix' and not exists (select 1 from public.templates where id = p_template_id) then
+    raise exception 'NOT_FOUND';
+  end if;
+  if (select count(*) from public.suggestions where ip_hash = v_ip and created_at > now() - interval '1 hour') >= 20
+     or (select count(*) from public.suggestions where created_at > now() - interval '1 day') >= 500 then
+    raise exception 'TOO_MANY';
+  end if;
+  insert into public.suggestions (kind, template_id, keyword, title, category, body, note, author, ip_hash)
+  values (p_kind, case when p_kind = 'fix' then p_template_id end,
+          nullif(left(trim(coalesce(p_keyword, '')), 300), ''), nullif(left(trim(coalesce(p_title, '')), 200), ''),
+          nullif(left(trim(coalesce(p_category, '')), 60), ''), left(trim(p_body), 10000),
+          nullif(left(trim(coalesce(p_note, '')), 1000), ''), v_author, v_ip)
+  returning * into sg;
+  perform set_config('sufler.actor', coalesce(nullif(v_author, ''), 'оператор'), true);
+  perform public._log(case p_kind when 'new' then 'Предложен шаблон' else 'Предложена правка' end,
+    coalesce(sg.title, (select title from public.templates where id = sg.template_id), '') ||
+    coalesce(' · «' || left(sg.note, 120) || '»', ''));
+  return json_build_object('ok', true, 'id', sg.id);
+end;
+$$;
+
+create or replace function public.suggestions_list(p_token text)
+returns json
+language plpgsql security definer
+set search_path = public, extensions
+as $$
+begin
+  perform public._auth(p_token, 'admin');
+  return (
+    select coalesce(json_agg(json_build_object(
+             'id', s.id, 'kind', s.kind, 'template_id', s.template_id,
+             'template_title', t.title, 'template_body', t.body, 'template_keyword', t.keyword, 'template_category', t.category,
+             'keyword', s.keyword, 'title', s.title, 'category', s.category, 'body', s.body, 'note', s.note,
+             'author', s.author, 'status', s.status, 'created_at', s.created_at,
+             'decided_at', s.decided_at, 'decided_by', s.decided_by)
+           order by (s.status = 'pending') desc, s.created_at desc), '[]'::json)
+      from (select * from public.suggestions
+             where status = 'pending' or decided_at > now() - interval '30 days'
+             order by created_at desc limit 300) s
+      left join public.templates t on t.id = s.template_id
+  );
+end;
+$$;
+
+-- Решение по предложению. Принять = добавить шаблон (или применить правку) с полями, которые видит админ.
+create or replace function public.suggestion_decide(
+  p_token text, p_id bigint, p_accept boolean,
+  p_keyword text default null, p_title text default null, p_category text default null,
+  p_body text default null, p_body_kz text default null, p_link text default null)
+returns json
+language plpgsql security definer
+set search_path = public, extensions
+as $$
+declare
+  sg public.suggestions;
+  t public.templates;
+begin
+  perform public._auth(p_token, 'admin');
+  select * into sg from public.suggestions where id = p_id for update;
+  if not found then raise exception 'NOT_FOUND'; end if;
+  if sg.status <> 'pending' then raise exception 'DUPLICATE'; end if;
+  if p_accept then
+    if coalesce(trim(p_keyword), '') = '' or coalesce(trim(p_title), '') = '' or coalesce(trim(p_body), '') = '' then
+      raise exception 'VALIDATION';
+    end if;
+    if sg.kind = 'fix' and exists (select 1 from public.templates where id = sg.template_id) then
+      update public.templates
+         set keyword = left(trim(p_keyword), 300), title = left(trim(p_title), 200),
+             category = nullif(left(trim(coalesce(p_category, '')), 60), ''), body = trim(p_body),
+             body_kz = nullif(trim(coalesce(p_body_kz, '')), ''), link = nullif(trim(coalesce(p_link, '')), ''),
+             updated_at = now()
+       where id = sg.template_id
+      returning * into t;
+    else
+      insert into public.templates (keyword, title, category, body, body_kz, link)
+      values (left(trim(p_keyword), 300), left(trim(p_title), 200), nullif(left(trim(coalesce(p_category, '')), 60), ''),
+              trim(p_body), nullif(trim(coalesce(p_body_kz, '')), ''), nullif(trim(coalesce(p_link, '')), ''))
+      returning * into t;
+    end if;
+  end if;
+  update public.suggestions
+     set status = case when p_accept then 'accepted' else 'rejected' end, decided_at = now(), decided_by = public._actor()
+   where id = p_id;
+  perform public._log(case when p_accept then 'Предложение принято' else 'Предложение отклонено' end,
+    coalesce(t.title, sg.title, (select title from public.templates where id = sg.template_id), '') ||
+    ' · от ' || coalesce(nullif(sg.author, ''), 'оператора'));
+  return json_build_object('ok', true, 'template', case when t.id is null then null else row_to_json(t) end);
+end;
+$$;
+
+create or replace function public.owner_journal(p_token text, p_limit int default 300)
+returns json
+language plpgsql security definer
+set search_path = public, extensions
+as $$
+begin
+  perform public._auth(p_token, 'owner');
+  return (
+    select coalesce(json_agg(json_build_object('at', j.at, 'actor', j.actor, 'action', j.action, 'details', j.details)
+                             order by j.at desc, j.id desc), '[]'::json)
+      from (select * from public.journal order by at desc, id desc limit least(greatest(coalesce(p_limit, 300), 1), 1000)) j
+  );
+end;
+$$;
+
 -- ---------- Права на функции ----------
 -- Служебные функции закрыты; сайту доступны только «публичные» ручки.
 
@@ -460,3 +734,16 @@ grant execute on function public.shortcut_save(text, bigint, text, text, text)  
 grant execute on function public.shortcut_delete(text, bigint)                       to anon, authenticated;
 grant execute on function public.owner_sessions(text)                                to anon, authenticated;
 grant execute on function public.owner_kick(text, uuid)                              to anon, authenticated;
+
+revoke execute on function public._actor()                         from public, anon, authenticated;
+revoke execute on function public._log(text, text)                 from public, anon, authenticated;
+revoke execute on function public._journal_templates()             from public, anon, authenticated;
+revoke execute on function public._journal_shortcuts()             from public, anon, authenticated;
+
+grant execute on function public.announcements_active()                              to anon, authenticated;
+grant execute on function public.announce_create(text, text, int)                    to anon, authenticated;
+grant execute on function public.announce_end(text, bigint)                          to anon, authenticated;
+grant execute on function public.suggestion_create(text, bigint, text, text, text, text, text, text) to anon, authenticated;
+grant execute on function public.suggestions_list(text)                              to anon, authenticated;
+grant execute on function public.suggestion_decide(text, bigint, boolean, text, text, text, text, text, text) to anon, authenticated;
+grant execute on function public.owner_journal(text, int)                            to anon, authenticated;
