@@ -152,6 +152,7 @@
       saveTemplate: (token, t) => run((db) => {
         auth(db, token, 'admin');
         if (!t.keyword.trim() || !t.title.trim() || !t.body.trim()) throw err('VALIDATION');
+        if (!String(t.body_kz || '').trim()) throw err('NEED_KZ');
         const row = { keyword: t.keyword.trim(), title: t.title.trim(), category: (t.category || '').trim() || null, body: t.body.trim(), body_kz: (t.body_kz || '').trim() || null, link: (t.link || '').trim() || null, notice: (t.notice || '').trim() || null };
         if (t.image !== undefined && t.image !== null) row.image = t.image || null;
         const out = (x) => { const { image, ...rest } = clone(x); return { ...rest, has_image: !!image }; };
@@ -269,6 +270,7 @@
         if (!sg) throw err('NOT_FOUND');
         if (sg.status !== 'pending') throw err('DUPLICATE');
         let row = null;
+        if (accept && !String(t.body_kz || '').trim()) throw err('NEED_KZ');
         if (accept) {
           const fields = { keyword: t.keyword, title: t.title, category: t.category || null, body: t.body, body_kz: t.body_kz || null, link: t.link || null };
           row = sg.kind === 'fix' && db.templates.find((x) => x.id === sg.template_id);

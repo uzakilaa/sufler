@@ -566,6 +566,9 @@ begin
     if coalesce(trim(p_keyword), '') = '' or coalesce(trim(p_title), '') = '' or coalesce(trim(p_body), '') = '' then
       raise exception 'VALIDATION';
     end if;
+    if coalesce(trim(p_body_kz), '') = '' then
+      raise exception 'NEED_KZ';
+    end if;
     if sg.kind = 'fix' and exists (select 1 from public.templates where id = sg.template_id) then
       update public.templates
          set keyword = left(trim(p_keyword), 300), title = left(trim(p_title), 200),
@@ -638,6 +641,10 @@ begin
   end if;
   if coalesce(p_image, '') <> '' and (p_image !~ '^data:image/(png|jpeg|webp);base64,' or length(p_image) > 3000000) then
     raise exception 'VALIDATION';
+  end if;
+  -- у каждого шаблона должен быть и казахский текст
+  if coalesce(trim(p_body_kz), '') = '' then
+    raise exception 'NEED_KZ';
   end if;
   if p_id is null then
     insert into public.templates (keyword, title, category, body, body_kz, link, notice, image)

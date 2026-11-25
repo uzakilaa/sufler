@@ -1171,6 +1171,7 @@
       const msg = $('#tpl-form-msg');
       msg.textContent = '';
       if (!data.keyword || !data.title || !data.body) { msg.textContent = 'Ключевые слова, название и текст обязательны.'; return; }
+      if (!data.body_kz) { msg.textContent = 'Добавьте текст на казахском — без него шаблон не сохранится.'; f.elements.body_kz.focus(); return; }
       if (data.link && !/^https?:\/\//i.test(data.link)) data.link = 'https://' + data.link;
       const btn = $('button[type=submit]', f);
       btn.disabled = true;
@@ -1192,7 +1193,7 @@
           toast('Предложение принято, шаблон сохранён', 'ok');
           loadSuggestions(true);
         } catch (e) {
-          if (!handleSessionError(e)) msg.textContent = e.code === 'DUPLICATE' ? 'Это предложение уже решил другой админ.' : e.code === 'NETWORK' ? 'Нет связи с базой.' : 'Не получилось сохранить. Проверьте поля.';
+          if (!handleSessionError(e)) msg.textContent = e.code === 'DUPLICATE' ? 'Это предложение уже решил другой админ.' : e.code === 'NEED_KZ' ? 'Добавьте текст на казахском — без него шаблон не сохранится.' : e.code === 'NETWORK' ? 'Нет связи с базой.' : 'Не получилось сохранить. Проверьте поля.';
         }
         btn.disabled = false;
         return;
@@ -1207,7 +1208,7 @@
         closeLayer($('#tpl-modal'));
         toast(data.id ? 'Шаблон обновлён' : 'Шаблон добавлен', 'ok');
       } catch (e) {
-        if (!handleSessionError(e)) msg.textContent = e.code === 'NETWORK' ? 'Нет связи с базой.' : 'Не получилось сохранить. Проверьте поля.';
+        if (!handleSessionError(e)) msg.textContent = e.code === 'NEED_KZ' ? 'Добавьте текст на казахском — без него шаблон не сохранится.' : e.code === 'NETWORK' ? 'Нет связи с базой.' : 'Не получилось сохранить. Проверьте поля.';
       }
       btn.disabled = false;
     });

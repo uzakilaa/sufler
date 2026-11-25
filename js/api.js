@@ -12,7 +12,7 @@
   }
 
   const KNOWN = ['SESSION_INVALID', 'SESSION_KICKED', 'SESSION_ENDED', 'SESSION_EXPIRED',
-    'FORBIDDEN', 'DUPLICATE', 'VALIDATION', 'NOT_FOUND', 'TOO_MANY'];
+    'FORBIDDEN', 'DUPLICATE', 'VALIDATION', 'NOT_FOUND', 'TOO_MANY', 'NEED_KZ'];
 
   window.SuflerSupabase = function (cfg) {
     const base = cfg.supabaseUrl.replace(/\/+$/, '');
