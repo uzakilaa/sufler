@@ -43,6 +43,7 @@
     opName: '',            // имя оператора для {имя} в шаблонах
     topics: [],            // темы, заведённые админами (могут быть пустыми)
     links: [],             // «Программы»: рабочие системы и ссылки
+    favs: [],              // избранное этого кода: [{ id, name, items: [id шаблонов] }]
   };
 
   let device = store.get('device');
@@ -221,7 +222,7 @@
     if (!isAdmin() && state.tab === 'sugg') switchTab('corrector');
     renderAnnouncements();
     renderLinks();
-    renderChips(!!$('#search').value.trim());
+    loadFavs();
     if (isAdmin()) loadSuggestions(true); else $('#sugg-count').textContent = '';
     updateRoleTime();
     renderDictList();
@@ -829,6 +830,10 @@
     state.fill = raw ? ex.values : {};
     state.rest = ex.rest;
     if (!raw) {
+      if (state.cat.startsWith('fav:')) {
+        const g = favGroup(state.cat.slice(4));
+        return (g ? g.items.map(findTpl).filter(Boolean) : []).map((t) => ({ t, rank: 9 }));
+      }
       const list = state.cat === 'all' ? state.templates : state.templates.filter((t) => catOf(t) === state.cat);
       return [...list].sort((a, b) => byCat(catOf(a), catOf(b)) || a.title.localeCompare(b.title, 'ru')).map((t) => ({ t, rank: 9 }));
     }
@@ -922,7 +927,7 @@
     state.templates.forEach((t) => counts.set(catOf(t), (counts.get(catOf(t)) || 0) + 1));
     state.topics.forEach((n) => { if (!counts.has(n)) counts.set(n, 0); });
     const cats = [...counts.keys()].sort(byCat);
-    if (state.cat !== 'all' && !counts.has(state.cat)) state.cat = 'all';
+    if (state.cat !== 'all' && !state.cat.startsWith('fav:') && !counts.has(state.cat)) state.cat = 'all';
     const box = $('#cat-chips');
     box.hidden = !state.templates.length;
     box.classList.toggle('searching', searching);
@@ -942,6 +947,7 @@
           ${t.link ? '<svg class="tpl-link-dot" aria-label="есть ссылка"><use href="#i-link"/></svg>' : ''}
           ${t.has_image ? '<span class="shot-badge" title="К шаблону есть скриншот — без него не отправлять"><svg><use href="#i-image"/></svg>скрин</span>' : ''}
           ${t.notice ? '<span class="warn-badge" title="Перед отправкой проверьте: есть предупреждение">!</span>' : ''}
+          ${isAdmin() ? `<button class="tpl-star${inFav(t) ? ' on' : ''}" type="button" title="Избранное: добавить в группу" aria-label="Избранное"><svg><use href="#i-star"/></svg></button>` : ''}
         </div>
         <p class="tpl-text">${unmark(hl(snippet(text, q), re))}</p>
         ${fillNote(t)}
@@ -955,16 +961,18 @@
   function renderTemplates() {
     if (state.templates.length) { renderFlow(); if (!belowTimer || !$('#suggest').classList.contains('waiting')) renderSuggest($('#draft').value, lastResult || ''); }
     // выбранная тема могла исчезнуть (удалили тему или последний шаблон в ней)
-    if (state.cat !== 'all' && !state.topics.includes(state.cat) && !state.templates.some((t) => catOf(t) === state.cat)) state.cat = 'all';
+    if (state.cat.startsWith('fav:')) { if (!favGroup(state.cat.slice(4)) && (!isAdmin() || state.favs.length)) state.cat = 'all'; }
+    else if (state.cat !== 'all' && !state.topics.includes(state.cat) && !state.templates.some((t) => catOf(t) === state.cat)) state.cat = 'all';
     const q = $('#search').value;
     const searching = !!q.trim();
     const res = searchTemplates(q);
     const re = termsRegex(searching ? (state.rest || q) : '');
     const hq = searching ? (state.rest || q) : '';
     renderChips(searching);
+    renderFavChips();
     $$('#lang-seg .seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.lang === state.lang));
     $('#tab-count').textContent = state.templates.length || '';
-    $('#tpl-count').textContent = searching ? `нашлось: ${res.length}` : state.cat === 'all' ? `всего: ${state.templates.length}` : `в теме: ${res.length}`;
+    $('#tpl-count').textContent = searching ? `нашлось: ${res.length}` : state.cat === 'all' ? `всего: ${state.templates.length}` : state.cat.startsWith('fav:') ? `в группе: ${res.length}` : `в теме: ${res.length}`;
     let html = '';
     if (!searching && state.cat === 'all') {
       let cur = null;
@@ -980,7 +988,10 @@
     const empty = $('#tpl-empty');
     if (!res.length) {
       empty.hidden = false;
-      empty.innerHTML = state.templates.length && !searching && state.cat !== 'all'
+      const fg = !searching && state.cat.startsWith('fav:') && favGroup(state.cat.slice(4));
+      empty.innerHTML = fg
+        ? `<b>В группе «${esc(fg.name)}» пока пусто</b>Нажмите ☆ на карточке шаблона и выберите эту группу.`
+        : state.templates.length && !searching && state.cat !== 'all'
         ? `<b>В теме «${esc(state.cat)}» пока нет шаблонов</b>${isAdmin() ? 'Добавьте первый кнопкой «+ Добавить шаблон» — тема подставится сама.' : 'Скоро появятся.'}`
         : state.templates.length
         ? `<b>Ничего не нашлось по «${esc(q.trim())}»</b>Даже кешбэк не помог. Попробуйте другое слово — или напишите ответ сами, корректор подстрахует.`
@@ -1052,6 +1063,8 @@
     list.addEventListener('click', (ev) => {
       const card = ev.target.closest('.tpl');
       if (!card) return;
+      const star = ev.target.closest('.tpl-star');
+      if (star) { clearTimeout(clickTimer); const t = findTpl(card.dataset.id); if (t) openFavPop(t, star); return; }
       if (ev.target.closest('.tpl-more')) { clearTimeout(clickTimer); openDetails(card.dataset.id); return; }
       clearTimeout(clickTimer);
       if (ev.detail > 1) return;
@@ -1067,7 +1080,7 @@
       const card = ev.target.closest('.tpl');
       clearTimeout(clickTimer);
       if (card) card.classList.remove('pressing');
-      if (card && !ev.target.closest('.tpl-more')) openDetails(card.dataset.id);
+      if (card && !ev.target.closest('.tpl-more, .tpl-star')) openDetails(card.dataset.id);
     });
     list.addEventListener('keydown', (ev) => {
       const card = ev.target.closest('.tpl');
@@ -1201,6 +1214,7 @@
     dimg.removeAttribute('src');
     if (t.has_image) getImage(t.id).then((u) => { if (u && String(state.openTemplateId) === String(t.id)) dimg.src = u; }).catch(() => {});
     $$('#drawer [data-admin]').forEach((el) => { el.hidden = !isAdmin(); });
+    $('#d-fav').classList.toggle('on', inFav(t));
     $('#d-suggest').hidden = isAdmin();
     openLayer($('#drawer'));
     setTimeout(() => $('#d-copy').focus(), 60);
@@ -2104,6 +2118,201 @@
   }
 
   /* =====================================================================
+   *  Избранное: у каждого кода свои группы шаблонов
+   * ===================================================================== */
+
+  const favGroup = (id) => state.favs.find((g) => String(g.id) === String(id));
+  const inFav = (t) => state.favs.some((g) => g.items.includes(String(t.id)));
+  const tok = () => state.session && state.session.token;
+
+  async function loadFavs() {
+    if (!isAdmin() || !tok()) { state.favs = []; renderTemplates(); return; }
+    try {
+      const list = await api.favsList(tok());
+      state.favs = (list || []).map((g) => ({ ...g, items: (g.items || []).map(String) }));
+    } catch (e) {
+      if (handleSessionError(e)) return;
+    }
+    renderTemplates();
+  }
+
+  function renderFavChips() {
+    const box = $('#fav-chips');
+    box.hidden = !isAdmin();
+    if (!isAdmin()) return;
+    box.innerHTML = '<span class="fav-label"><svg><use href="#i-star"/></svg>Избранное</span>'
+      + state.favs.map((g) => `<button class="chip fav-chip${state.cat === 'fav:' + g.id ? ' active' : ''}" type="button" data-cat="fav:${esc(g.id)}">${esc(g.name)}<span>${g.items.filter((id) => findTpl(id)).length}</span></button>`).join('')
+      + `<button class="chip chip-add" type="button" data-fav-manage>${state.favs.length ? 'Группы…' : '+ Создать группу'}</button>`;
+  }
+
+  /* ---------- Всплывающее меню «в какую группу» ---------- */
+  let favPopFor = null;
+  function closeFavPop() {
+    const p = $('#fav-pop');
+    p.hidden = true;
+    favPopFor = null;
+  }
+  function renderFavPop() {
+    const t = favPopFor && findTpl(favPopFor.id);
+    if (!t) return closeFavPop();
+    $('#fav-pop-list').innerHTML = state.favs.length
+      ? state.favs.map((g) => `<label class="fav-opt"><input type="checkbox" data-g="${esc(g.id)}"${g.items.includes(String(t.id)) ? ' checked' : ''}><span>${esc(g.name)}</span></label>`).join('')
+      : '<p class="fav-empty">Групп пока нет — создайте первую ниже.</p>';
+  }
+  function openFavPop(t, btn) {
+    if (!isAdmin()) return;
+    favPopFor = { id: t.id };
+    renderFavPop();
+    const p = $('#fav-pop');
+    p.hidden = false;
+    const r = btn.getBoundingClientRect();
+    const w = p.offsetWidth;
+    const h = p.offsetHeight;
+    let left = Math.min(window.innerWidth - w - 12, Math.max(12, r.right - w));
+    let top = r.bottom + 8;
+    if (top + h > window.innerHeight - 12) top = Math.max(12, r.top - h - 8);
+    p.style.left = left + 'px';
+    p.style.top = top + 'px';
+    setTimeout(() => { const first = $('#fav-pop input'); if (first) first.focus(); }, 30);
+  }
+
+  function refreshList() {
+    $('#tpl-list').classList.add('quiet');
+    renderTemplates();
+    const t = state.openTemplateId && findTpl(state.openTemplateId);
+    if (t && !$('#drawer').hidden) $('#d-fav').classList.toggle('on', inFav(t));
+  }
+
+  async function favToggle(gid, tid, on) {
+    const g = favGroup(gid);
+    if (!g) return;
+    try {
+      await api.favSet(tok(), Number(gid) || gid, Number(tid) || tid, on);
+      g.items = on ? [...new Set([...g.items, String(tid)])] : g.items.filter((x) => x !== String(tid));
+      refreshList();
+    } catch (e) {
+      if (!handleSessionError(e)) toast(e.code === 'TOO_MANY' ? 'В группе уже 300 шаблонов — это максимум.' : 'Не получилось сохранить избранное.', 'warn');
+      renderFavPop();
+    }
+  }
+
+  async function favCreate(name, addTid) {
+    name = String(name || '').replace(/\s+/g, ' ').trim();
+    if (!name) return null;
+    try {
+      const g = await api.favGroupSave(tok(), null, name);
+      const group = { ...g, items: [] };
+      state.favs.push(group);
+      if (addTid != null) await favToggle(group.id, addTid, true);
+      else refreshList();
+      return group;
+    } catch (e) {
+      if (!handleSessionError(e)) toast(e.code === 'TOO_MANY' ? 'Больше 30 групп сделать нельзя.' : 'Не получилось создать группу.', 'warn');
+      return null;
+    }
+  }
+
+  /* ---------- Окно «Группы» ---------- */
+  function renderFavModal() {
+    const list = $('#fav-groups');
+    list.innerHTML = state.favs.map((g) => `
+      <li data-g="${esc(g.id)}">
+        <input value="${esc(g.name)}" maxlength="40" aria-label="Название группы">
+        <span class="fav-n">${g.items.filter((id) => findTpl(id)).length}</span>
+        <button class="btn ghost" type="button" data-del-fav>Удалить</button>
+      </li>`).join('');
+    $('#fav-groups-empty').hidden = !!state.favs.length;
+  }
+  function openFavModal() {
+    if (!isAdmin()) return;
+    $('#fav-new-form').reset();
+    renderFavModal();
+    openLayer($('#fav-modal'));
+    setTimeout(() => $('#fav-new-form input').focus(), 50);
+  }
+
+  function bindFavs() {
+    $('#fav-chips').addEventListener('click', (ev) => {
+      if (ev.target.closest('[data-fav-manage]')) { openFavModal(); return; }
+      const b = ev.target.closest('.chip[data-cat]');
+      if (!b) return;
+      state.cat = b.dataset.cat;
+      store.set('cat', state.cat);
+      $('#tpl-list').classList.remove('quiet');
+      if ($('#search').value.trim()) $('#search').value = '';
+      renderTemplates();
+    });
+
+    // меню на карточке
+    $('#fav-pop-list').addEventListener('change', (ev) => {
+      const c = ev.target.closest('input[data-g]');
+      if (c && favPopFor) favToggle(c.dataset.g, favPopFor.id, c.checked);
+    });
+    $('#fav-pop-form').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const input = $('#fav-pop-form input');
+      if (!favPopFor || !input.value.trim()) return;
+      const g = await favCreate(input.value, favPopFor.id);
+      if (g) { input.value = ''; renderFavPop(); toast(`Добавлено в «${g.name}»`, 'ok'); }
+    });
+    document.addEventListener('pointerdown', (ev) => {
+      if ($('#fav-pop').hidden) return;
+      if (ev.target.closest('#fav-pop, .tpl-star, #d-fav')) return;
+      closeFavPop();
+    });
+    document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && !$('#fav-pop').hidden) { ev.stopPropagation(); closeFavPop(); } }, true);
+    window.addEventListener('resize', closeFavPop);
+
+    $('#d-fav').addEventListener('click', () => {
+      const t = findTpl(state.openTemplateId);
+      if (t) openFavPop(t, $('#d-fav'));
+    });
+
+    // окно «Группы»
+    $('#fav-new-form').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const input = $('#fav-new-form input');
+      const g = await favCreate(input.value, null);
+      if (g) { input.value = ''; renderFavModal(); }
+    });
+    $('#fav-groups').addEventListener('change', async (ev) => {
+      const li = ev.target.closest('li[data-g]');
+      if (!li || ev.target.tagName !== 'INPUT') return;
+      const g = favGroup(li.dataset.g);
+      const name = ev.target.value.replace(/\s+/g, ' ').trim();
+      if (!g || !name || name === g.name) { if (g) ev.target.value = g.name; return; }
+      try {
+        await api.favGroupSave(tok(), Number(g.id) || g.id, name);
+        g.name = name;
+        refreshList();
+        toast('Группа переименована', 'ok');
+      } catch (e) {
+        if (!handleSessionError(e)) toast('Не получилось переименовать.', 'warn');
+        ev.target.value = g.name;
+      }
+    });
+    $('#fav-groups').addEventListener('click', async (ev) => {
+      if (!ev.target.closest('[data-del-fav]')) return;
+      const li = ev.target.closest('li[data-g]');
+      const g = li && favGroup(li.dataset.g);
+      if (!g) return;
+      closeLayer($('#fav-modal'));
+      const ok = await confirmBox('Удалить группу?', `Группа «${g.name}» исчезнет у всех, кто входит по этому коду. Сами шаблоны останутся.`, 'Удалить');
+      if (!ok) { openFavModal(); return; }
+      try {
+        await api.favGroupDelete(tok(), Number(g.id) || g.id);
+        state.favs = state.favs.filter((x) => x !== g);
+        if (state.cat === 'fav:' + g.id) state.cat = 'all';
+        refreshList();
+        toast('Группа удалена');
+      } catch (e) {
+        if (!handleSessionError(e)) toast('Не получилось удалить группу.', 'warn');
+      }
+      openFavModal();
+    });
+  }
+
+  /* =====================================================================
    *  Слои: модальные окна и выезжающая панель
    * ===================================================================== */
 
@@ -2147,7 +2356,7 @@
     });
     document.addEventListener('keydown', (ev) => {
       if (ev.key === 'Escape') {
-        const open = ['#confirm-modal', '#shot-view', '#notice-modal', '#app-modal', '#topic-modal', '#tpl-modal', '#dict-modal', '#drawer'].map((s) => $(s)).find((el) => !el.hidden);
+        const open = ['#confirm-modal', '#fav-modal', '#shot-view', '#notice-modal', '#app-modal', '#topic-modal', '#tpl-modal', '#dict-modal', '#drawer'].map((s) => $(s)).find((el) => !el.hidden);
         if (open) { ev.preventDefault(); closeLayer(open); }
       }
     });
@@ -2171,7 +2380,7 @@
     });
 
     document.addEventListener('keydown', (ev) => {
-      const layerOpen = ['#confirm-modal', '#tpl-modal', '#dict-modal', '#drawer', '#gate', '#notice-modal', '#shot-view', '#app-modal', '#topic-modal'].some((s) => !$(s).hidden);
+      const layerOpen = ['#confirm-modal', '#tpl-modal', '#dict-modal', '#drawer', '#gate', '#notice-modal', '#shot-view', '#app-modal', '#topic-modal', '#fav-modal'].some((s) => !$(s).hidden);
       if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey) && state.tab === 'corrector' && !layerOpen) {
         ev.preventDefault();
         copyResult(true);
@@ -2232,6 +2441,7 @@
     bindOwner();
     bindTeam();
     bindExtra();
+    bindFavs();
     bindLayers();
     bindGlobal();
 

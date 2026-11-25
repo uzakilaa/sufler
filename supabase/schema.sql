@@ -464,17 +464,7 @@ create trigger shortcuts_journal after insert or update or delete on public.shor
   for each row execute function public._journal_shortcuts();
 
 -- Объявления: читать может кто угодно (только действующие)
-create or replace function public.announcements_active()
-returns json
-language sql stable security definer
-set search_path = public, extensions
-as $$
-  select coalesce(json_agg(json_build_object('id', id, 'body', body, 'author', author,
-                                             'created_at', created_at, 'expires_at', expires_at)
-                           order by created_at desc), '[]'::json)
-    from public.announcements
-   where ended_at is null and expires_at > now()
-$$;
+-- announcements_active — ниже, в блоке «Имена кодов видит только владелец».
 
 create or replace function public.announce_create(p_token text, p_body text, p_hours int)
 returns json
@@ -553,28 +543,7 @@ begin
 end;
 $$;
 
-create or replace function public.suggestions_list(p_token text)
-returns json
-language plpgsql security definer
-set search_path = public, extensions
-as $$
-begin
-  perform public._auth(p_token, 'admin');
-  return (
-    select coalesce(json_agg(json_build_object(
-             'id', s.id, 'kind', s.kind, 'template_id', s.template_id,
-             'template_title', t.title, 'template_body', t.body, 'template_keyword', t.keyword, 'template_category', t.category,
-             'keyword', s.keyword, 'title', s.title, 'category', s.category, 'body', s.body, 'note', s.note,
-             'author', s.author, 'status', s.status, 'created_at', s.created_at,
-             'decided_at', s.decided_at, 'decided_by', s.decided_by)
-           order by (s.status = 'pending') desc, s.created_at desc), '[]'::json)
-      from (select * from public.suggestions
-             where status = 'pending' or decided_at > now() - interval '30 days'
-             order by created_at desc limit 300) s
-      left join public.templates t on t.id = s.template_id
-  );
-end;
-$$;
+-- suggestions_list — ниже, в блоке «Имена кодов видит только владелец».
 
 -- Решение по предложению. Принять = добавить шаблон (или применить правку) с полями, которые видит админ.
 create or replace function public.suggestion_decide(
@@ -875,6 +844,155 @@ end;
 $$;
 
 grant execute on function public.session_set_name(text, text) to anon, authenticated;
+
+-- ---------- Имена кодов видит только владелец ----------
+-- Объявления видят все, поэтому автора в них больше не отдаём (он есть в журнале владельца).
+create or replace function public.announcements_active()
+returns json
+language sql stable security definer
+set search_path = public, extensions
+as $$
+  select coalesce(json_agg(json_build_object('id', id, 'body', body,
+                                             'created_at', created_at, 'expires_at', expires_at)
+                           order by created_at desc), '[]'::json)
+    from public.announcements
+   where ended_at is null and expires_at > now()
+$$;
+
+-- «Кто решил» по предложению: владельцу — имя кода, админам — просто «админ».
+create or replace function public.suggestions_list(p_token text)
+returns json
+language plpgsql security definer
+set search_path = public, extensions
+as $$
+declare
+  me public.sessions;
+begin
+  me := public._auth(p_token, 'admin');
+  return (
+    select coalesce(json_agg(json_build_object(
+             'id', s.id, 'kind', s.kind, 'template_id', s.template_id,
+             'template_title', t.title, 'template_body', t.body, 'template_keyword', t.keyword, 'template_category', t.category,
+             'keyword', s.keyword, 'title', s.title, 'category', s.category, 'body', s.body, 'note', s.note,
+             'author', s.author, 'status', s.status, 'created_at', s.created_at,
+             'decided_at', s.decided_at,
+             'decided_by', case when me.role = 'owner' then s.decided_by when s.decided_by is null then null else 'админ' end)
+           order by (s.status = 'pending') desc, s.created_at desc), '[]'::json)
+      from (select * from public.suggestions
+             where status = 'pending' or decided_at > now() - interval '30 days'
+             order by created_at desc limit 300) s
+      left join public.templates t on t.id = s.template_id
+  );
+end;
+$$;
+
+-- ---------- Избранное: у каждого кода свои группы шаблонов ----------
+create table if not exists public.fav_groups (
+  id          bigint generated always as identity primary key,
+  code_id     bigint not null references public.access_codes(id) on delete cascade,
+  name        text not null check (length(trim(name)) between 1 and 40),
+  sort        int  not null default 0,
+  created_at  timestamptz not null default now()
+);
+create index if not exists fav_groups_code_idx on public.fav_groups (code_id);
+
+create table if not exists public.fav_items (
+  group_id     bigint not null references public.fav_groups(id) on delete cascade,
+  template_id  bigint not null references public.templates(id) on delete cascade,
+  added_at     timestamptz not null default now(),
+  primary key (group_id, template_id)
+);
+
+alter table public.fav_groups enable row level security;
+alter table public.fav_items  enable row level security;
+revoke all on public.fav_groups, public.fav_items from anon, authenticated;
+
+-- Группы своего кода вместе с шаблонами в них
+create or replace function public.favs_list(p_token text)
+returns json
+language plpgsql security definer
+set search_path = public, extensions
+as $$
+declare
+  s public.sessions;
+begin
+  s := public._auth(p_token, 'admin');
+  return (
+    select coalesce(json_agg(json_build_object(
+             'id', g.id, 'name', g.name, 'sort', g.sort,
+             'items', coalesce((select json_agg(i.template_id order by i.added_at) from public.fav_items i where i.group_id = g.id), '[]'::json))
+           order by g.sort, g.id), '[]'::json)
+      from public.fav_groups g
+     where g.code_id = s.code_id
+  );
+end;
+$$;
+
+-- Создать (p_id = null) или переименовать группу
+create or replace function public.fav_group_save(p_token text, p_id bigint, p_name text)
+returns json
+language plpgsql security definer
+set search_path = public, extensions
+as $$
+declare
+  s public.sessions;
+  g public.fav_groups;
+  v text := left(trim(regexp_replace(coalesce(p_name, ''), '\s+', ' ', 'g')), 40);
+begin
+  s := public._auth(p_token, 'admin');
+  if v = '' then raise exception 'VALIDATION'; end if;
+  if p_id is null then
+    if (select count(*) from public.fav_groups where code_id = s.code_id) >= 30 then raise exception 'TOO_MANY'; end if;
+    insert into public.fav_groups (code_id, name, sort)
+    values (s.code_id, v, coalesce((select max(sort) + 1 from public.fav_groups where code_id = s.code_id), 0))
+    returning * into g;
+  else
+    update public.fav_groups set name = v where id = p_id and code_id = s.code_id returning * into g;
+    if not found then raise exception 'NOT_FOUND'; end if;
+  end if;
+  return json_build_object('id', g.id, 'name', g.name, 'sort', g.sort, 'items', '[]'::json);
+end;
+$$;
+
+create or replace function public.fav_group_delete(p_token text, p_id bigint)
+returns json
+language plpgsql security definer
+set search_path = public, extensions
+as $$
+declare
+  s public.sessions;
+begin
+  s := public._auth(p_token, 'admin');
+  delete from public.fav_groups where id = p_id and code_id = s.code_id;
+  return json_build_object('ok', true);
+end;
+$$;
+
+-- Положить шаблон в группу (p_on = true) или убрать из неё
+create or replace function public.fav_set(p_token text, p_group_id bigint, p_template_id bigint, p_on boolean)
+returns json
+language plpgsql security definer
+set search_path = public, extensions
+as $$
+declare
+  s public.sessions;
+begin
+  s := public._auth(p_token, 'admin');
+  if not exists (select 1 from public.fav_groups where id = p_group_id and code_id = s.code_id) then raise exception 'NOT_FOUND'; end if;
+  if p_on then
+    if (select count(*) from public.fav_items where group_id = p_group_id) >= 300 then raise exception 'TOO_MANY'; end if;
+    insert into public.fav_items (group_id, template_id) values (p_group_id, p_template_id) on conflict do nothing;
+  else
+    delete from public.fav_items where group_id = p_group_id and template_id = p_template_id;
+  end if;
+  return json_build_object('ok', true);
+end;
+$$;
+
+grant execute on function public.favs_list(text)                                 to anon, authenticated;
+grant execute on function public.fav_group_save(text, bigint, text)              to anon, authenticated;
+grant execute on function public.fav_group_delete(text, bigint)                  to anon, authenticated;
+grant execute on function public.fav_set(text, bigint, bigint, boolean)          to anon, authenticated;
 
 -- ---------- Права на функции ----------
 -- Служебные функции закрыты; сайту доступны только «публичные» ручки.

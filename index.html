@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=18">
+  <link rel="stylesheet" href="css/style.css?v=19">
 </head>
 <body>
   <!-- Фон рисуется кодом: пятна плывут, поверх лёгкое зерно -->
@@ -53,6 +53,7 @@
     <symbol id="i-oops" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
     <symbol id="i-coin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 7.5v9M14.6 9.6c-.5-.8-1.5-1.3-2.6-1.3-1.5 0-2.6.8-2.6 1.9 0 2.6 5.4 1.3 5.4 3.9 0 1.1-1.2 1.9-2.8 1.9-1.2 0-2.2-.5-2.7-1.3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
     <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3.6 2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z" fill="var(--star-fill, none)" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
     <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5zM4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
   </svg>
 
@@ -200,6 +201,7 @@
           <button class="btn btn-green" id="btn-add-tpl" type="button" hidden>+ Добавить шаблон</button>
           <button class="btn ghost" id="btn-suggest" type="button">Предложить шаблон</button>
         </div>
+        <div class="fav-chips" id="fav-chips" hidden></div>
         <div class="cat-chips" id="cat-chips" hidden></div>
         <details class="memo" id="tpl-memo">
           <summary><svg class="ico"><use href="#i-book"/></svg>Памятка: как вставить номер, сумму, имя в шаблон<span class="memo-arrow" aria-hidden="true">▾</span></summary>
@@ -339,6 +341,7 @@
         <button class="btn btn-copy" id="d-copy" type="button"><svg class="ico"><use href="#i-copy"/></svg><span id="d-copy-label">Копировать</span></button>
         <button class="btn btn-copy" id="d-copy-kz" type="button" hidden><svg class="ico"><use href="#i-copy"/></svg>Копировать ҚАЗ</button>
         <span class="spacer"></span>
+        <button class="btn ghost d-fav" id="d-fav" type="button" data-admin hidden><svg class="ico"><use href="#i-star"/></svg>В избранное</button>
         <button class="btn ghost" id="d-suggest" type="button">Предложить правку</button>
         <button class="btn btn-green" id="d-edit" type="button" data-admin hidden>Редактировать</button>
         <button class="btn danger" id="d-delete" type="button" data-admin hidden>Удалить</button>
@@ -515,6 +518,30 @@
     </form>
   </div>
 
+  <div class="fav-pop" id="fav-pop" hidden role="dialog" aria-label="Добавить в избранное">
+    <div class="fav-pop-title"><svg><use href="#i-star"/></svg>В группу избранного</div>
+    <div class="fav-pop-list" id="fav-pop-list"></div>
+    <form class="fav-pop-form" id="fav-pop-form" autocomplete="off">
+      <input maxlength="40" placeholder="Новая группа…" aria-label="Новая группа">
+      <button class="btn btn-green" type="submit">+</button>
+    </form>
+  </div>
+
+  <div class="modal-wrap" id="fav-modal" hidden>
+    <div class="scrim" data-close></div>
+    <div class="modal modal-small">
+      <button class="icon-btn modal-close" data-close type="button" aria-label="Закрыть"><svg><use href="#i-close"/></svg></button>
+      <h2>Группы избранного</h2>
+      <p class="muted small">Группы общие для всех, кто входит по этому коду. У другого кода — свои. Чтобы добавить шаблон, нажмите ☆ на его карточке.</p>
+      <form class="fav-new" id="fav-new-form" autocomplete="off">
+        <input maxlength="40" placeholder="Название новой группы" aria-label="Название новой группы" required>
+        <button class="btn btn-green" type="submit">Создать</button>
+      </form>
+      <ul class="fav-groups" id="fav-groups"></ul>
+      <p class="muted small" id="fav-groups-empty">Групп пока нет.</p>
+    </div>
+  </div>
+
   <div class="modal-wrap" id="confirm-modal" hidden>
     <div class="scrim" data-close></div>
     <div class="modal modal-small">
@@ -529,16 +556,16 @@
 
   <div class="toasts" id="toasts" aria-live="polite"></div>
 
-  <script src="js/config.js?v=18"></script>
-  <script src="js/vocab.js?v=18"></script>
-  <script src="js/words.js?v=18"></script>
-  <script src="js/speller.js?v=18"></script>
-  <script src="js/corrector.js?v=18"></script>
-  <script src="js/tones.js?v=18"></script>
-  <script src="js/fill.js?v=18"></script>
-  <script src="js/api.js?v=18"></script>
-  <script src="js/mock-backend.js?v=18"></script>
-  <script src="js/pets.js?v=18"></script>
-  <script src="js/app.js?v=18"></script>
+  <script src="js/config.js?v=19"></script>
+  <script src="js/vocab.js?v=19"></script>
+  <script src="js/words.js?v=19"></script>
+  <script src="js/speller.js?v=19"></script>
+  <script src="js/corrector.js?v=19"></script>
+  <script src="js/tones.js?v=19"></script>
+  <script src="js/fill.js?v=19"></script>
+  <script src="js/api.js?v=19"></script>
+  <script src="js/mock-backend.js?v=19"></script>
+  <script src="js/pets.js?v=19"></script>
+  <script src="js/app.js?v=19"></script>
 </body>
 </html>

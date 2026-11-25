@@ -49,6 +49,7 @@
     db.suggestions = db.suggestions || [];
     db.journal = db.journal || [];
     db.topics = db.topics || [];
+    db.favs = db.favs || [];
     db.links = db.links || [
       { id: 1, title: 'Пример: база знаний', url: 'https://example.com/kb', note: 'демо-ссылка', sort: 1 },
     ];
@@ -200,7 +201,32 @@
         db.shortcuts = db.shortcuts.filter((x) => x.id !== id);
         return { ok: true };
       }),
-      announcements: () => run((db) => clone(db.announcements.filter((a) => !a.ended_at && new Date(a.expires_at) > new Date()).reverse())),
+      announcements: () => run((db) => clone(db.announcements.filter((a) => !a.ended_at && new Date(a.expires_at) > new Date()).reverse().map(({ author, ...a }) => a))),
+      favsList: (token) => run((db) => {
+        const s = auth(db, token, 'admin');
+        return clone(db.favs.filter((g) => g.code_id === s.code_id).map(({ code_id, ...g }) => g));
+      }),
+      favGroupSave: (token, id, name) => run((db) => {
+        const s = auth(db, token, 'admin');
+        const v = String(name || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+        if (!v) throw err('VALIDATION');
+        let g = id && db.favs.find((x) => x.id === id && x.code_id === s.code_id);
+        if (id && !g) throw err('NOT_FOUND');
+        if (g) g.name = v; else { g = { id: ++db.seq, code_id: s.code_id, name: v, sort: db.favs.length, items: [] }; db.favs.push(g); }
+        return { id: g.id, name: g.name, sort: g.sort, items: [] };
+      }),
+      favGroupDelete: (token, id) => run((db) => {
+        const s = auth(db, token, 'admin');
+        db.favs = db.favs.filter((g) => !(g.id === id && g.code_id === s.code_id));
+        return { ok: true };
+      }),
+      favSet: (token, gid, tid, on) => run((db) => {
+        const s = auth(db, token, 'admin');
+        const g = db.favs.find((x) => x.id === gid && x.code_id === s.code_id);
+        if (!g) throw err('NOT_FOUND');
+        g.items = on ? [...new Set([...g.items, tid])] : g.items.filter((x) => x !== tid);
+        return { ok: true };
+      }),
       announce: (token, body, hours) => run((db) => {
         const s = auth(db, token, 'admin');
         if (!body.trim() || hours < 1 || hours > 48) throw err('VALIDATION');
