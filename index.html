@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=15">
+  <link rel="stylesheet" href="css/style.css?v=16">
 </head>
 <body>
   <!-- Фон рисуется кодом: пятна плывут, поверх лёгкое зерно -->
@@ -214,6 +214,7 @@
               <span>MCC-код</span><code>мсс 4722</code>
               <span>ID мерчанта</span><code>мерч 165459</code>
               <span>ФИО ЧСИ</span><code>чси иванов иван иванович</code>
+              <span>Номер обращения</span><code>заявл 123456</code>
             </div>
             <ul>
               <li>ФИО можно вставить капсом из Колвира — сайт сам сделает «Иванов Иван Иванович».</li>
@@ -355,7 +356,7 @@
       </div>
       <label>Тема<input name="category" maxlength="60" list="cat-list" placeholder="Кредиты, Контакты, Переводы…"><datalist id="cat-list"></datalist><span class="field-tip">Можно вписать новую тему — она появится в списке тем.</span></label>
       <label>Текст на русском <b>*</b><textarea name="body" rows="7" maxlength="10000" required placeholder="Полный текст ответа клиенту"></textarea></label>
-      <p class="muted small form-tip">Можно оставить место для подстановки из поиска: <code>{телефон}</code> <code>{сумма}</code> <code>{карта}</code> <code>{ICCID}</code> <code>{дата}</code> <code>{модель}</code> <code>{банк}</code> <code>{MCC}</code> <code>{мерчант}</code> <code>{ЧСИ}</code>. Кусок в <code>[[ ]]</code> пропадёт, если значение не дописали в поиск: <code>нет доступа к номеру[[ {телефон}]], мы…</code></p>
+      <p class="muted small form-tip">Можно оставить место для подстановки из поиска: <code>{телефон}</code> <code>{сумма}</code> <code>{карта}</code> <code>{ICCID}</code> <code>{дата}</code> <code>{модель}</code> <code>{банк}</code> <code>{MCC}</code> <code>{мерчант}</code> <code>{ЧСИ}</code> <code>{обращение}</code>. Кусок в <code>[[ ]]</code> пропадёт, если значение не дописали в поиск: <code>нет доступа к номеру[[ {телефон}]], мы…</code></p>
       <label>Текст на казахском<textarea name="body_kz" rows="5" maxlength="10000" placeholder="Необязательно"></textarea></label>
       <label>Ссылка<input name="link" maxlength="1000" placeholder="https://… — инструкция или страница банка"></label>
       <label>Предупреждение при копировании<textarea name="notice" rows="2" maxlength="1000" placeholder="Необязательно. Например: «Текст составлен под конкретного клиента — проверьте перед отправкой»"></textarea></label>
@@ -526,16 +527,16 @@
 
   <div class="toasts" id="toasts" aria-live="polite"></div>
 
-  <script src="js/config.js?v=15"></script>
-  <script src="js/vocab.js?v=15"></script>
-  <script src="js/words.js?v=15"></script>
-  <script src="js/speller.js?v=15"></script>
-  <script src="js/corrector.js?v=15"></script>
-  <script src="js/tones.js?v=15"></script>
-  <script src="js/fill.js?v=15"></script>
-  <script src="js/api.js?v=15"></script>
-  <script src="js/mock-backend.js?v=15"></script>
-  <script src="js/pets.js?v=15"></script>
-  <script src="js/app.js?v=15"></script>
+  <script src="js/config.js?v=16"></script>
+  <script src="js/vocab.js?v=16"></script>
+  <script src="js/words.js?v=16"></script>
+  <script src="js/speller.js?v=16"></script>
+  <script src="js/corrector.js?v=16"></script>
+  <script src="js/tones.js?v=16"></script>
+  <script src="js/fill.js?v=16"></script>
+  <script src="js/api.js?v=16"></script>
+  <script src="js/mock-backend.js?v=16"></script>
+  <script src="js/pets.js?v=16"></script>
+  <script src="js/app.js?v=16"></script>
 </body>
 </html>
