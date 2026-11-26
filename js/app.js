@@ -432,7 +432,7 @@
     moveInk();
     if (tab === 'templates') setTimeout(() => $('#search').focus(), 30);
     if (tab === 'corrector') setTimeout(() => $('#draft').focus(), 30);
-    if (tab === 'owner') { loadSessions(); loadJournal(); }
+    if (tab === 'owner') { loadSessions(); loadJournal(); loadOwnerFavs(); }
     if (tab === 'sugg') loadSuggestions();
     if (tab === 'apps') loadLinks();
   }
@@ -2333,7 +2333,33 @@
     setTimeout(() => $('#fav-new-form input').focus(), 50);
   }
 
+  /* ---------- Владелец: избранное всех кодов (только просмотр) ---------- */
+  async function loadOwnerFavs() {
+    const box = $('#ofavs-list');
+    if (!isOwner() || !tok()) return;
+    try {
+      const list = await api.ownerFavs(tok());
+      const plural = (n, a, b, c) => n + ' ' + (n % 10 === 1 && n % 100 !== 11 ? a : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? b : c);
+      box.innerHTML = (list || []).map((c) => {
+        const items = c.groups.reduce((s, g) => s + g.items.length, 0);
+        return `<details class="ofav-code"${c.groups.length ? '' : ' data-empty'}>
+          <summary><span class="code-mask">••••••</span> <b>${esc(c.code)}</b>
+            <span class="ofav-meta">${c.groups.length ? plural(c.groups.length, 'группа', 'группы', 'групп') + ' · ' + plural(items, 'шаблон', 'шаблона', 'шаблонов') : 'избранного нет'}</span></summary>
+          ${c.groups.map((g) => `<div class="ofav-group"><h4>${esc(g.name)} <span>${g.items.length}</span></h4>
+            ${g.items.length ? '<ul>' + g.items.map((t) => `<li><button type="button" data-tid="${esc(t.id)}">${esc(t.title)}</button></li>`).join('') + '</ul>' : '<p class="muted small">пусто</p>'}</div>`).join('')}
+        </details>`;
+      }).join('') || '<p class="muted small">Кодов нет.</p>';
+    } catch (e) {
+      if (!handleSessionError(e)) box.innerHTML = '<p class="muted small">Не получилось загрузить. Нажмите «Обновить».</p>';
+    }
+  }
+
   function bindFavs() {
+    $('#btn-ofavs-refresh').addEventListener('click', loadOwnerFavs);
+    $('#ofavs-list').addEventListener('click', (ev) => {
+      const b = ev.target.closest('[data-tid]');
+      if (b) openDetails(b.dataset.tid);
+    });
     $('#fav-chips').addEventListener('click', (ev) => {
       if (ev.target.closest('[data-fav-manage]')) { openFavModal(); return; }
       const b = ev.target.closest('.chip[data-cat]');

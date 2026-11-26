@@ -87,6 +87,7 @@
       ownerSessions: (token) => rpc('owner_sessions', { p_token: token }),
       setSessionName: (token, name) => rpc('session_set_name', { p_token: token, p_name: name || '' }),
       kzCheck: (token, id, checked) => rpc('template_kz_check', { p_token: token, p_id: id, p_checked: !!checked }),
+      ownerFavs: (token) => rpc('owner_favs', { p_token: token }),
       favsList: (token) => rpc('favs_list', { p_token: token }),
       favGroupSave: (token, id, name) => rpc('fav_group_save', { p_token: token, p_id: id || null, p_name: name }),
       favGroupDelete: (token, id) => rpc('fav_group_delete', { p_token: token, p_id: id }),

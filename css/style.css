@@ -1034,3 +1034,21 @@ html { scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: rgba(67
 .h48-btn:hover { background: #d9a23a; color: #fff; }
 .h48-btn.pulse { animation: oopsPulse .55s var(--ease); }
 .pane-foot .oops-btn { padding: 8px 14px; }
+
+/* Владелец: избранное по кодам */
+.ofavs-card { grid-column: 1 / -1; }
+.ofavs { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.ofav-code { border-radius: 14px; background: rgba(255, 255, 255, .55); border: 1px solid var(--line); }
+.ofav-code summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 10px 14px; flex-wrap: wrap; }
+.ofav-code summary::-webkit-details-marker { display: none; }
+.ofav-code summary::after { content: '▾'; margin-left: auto; color: var(--muted); transition: transform .2s; }
+.ofav-code[open] summary::after { transform: rotate(180deg); }
+.ofav-code[data-empty] summary { cursor: default; opacity: .7; }
+.ofav-code[data-empty] summary::after { content: ''; }
+.ofav-meta { font-size: 12.5px; color: var(--muted); font-weight: 600; }
+.ofav-group { padding: 4px 14px 10px; }
+.ofav-group h4 { margin: 6px 0; font-size: 13.5px; color: #9a6a12; display: flex; align-items: center; gap: 6px; }
+.ofav-group h4 span { font-size: 11.5px; background: #fff4dc; border-radius: 999px; padding: 1px 7px; }
+.ofav-group ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.ofav-group li button { border: 1px solid var(--line); background: #fff; border-radius: 10px; padding: 5px 10px; font: inherit; font-size: 13px; cursor: pointer; text-align: left; }
+.ofav-group li button:hover { border-color: var(--sage); background: var(--green-soft); }

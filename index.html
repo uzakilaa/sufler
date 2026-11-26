@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=30">
+  <link rel="stylesheet" href="css/style.css?v=31">
 </head>
 <body>
   <!-- Фон рисуется кодом: пятна плывут, поверх лёгкое зерно -->
@@ -305,13 +305,21 @@
             <p class="import-preview" id="import-preview"></p>
             <button class="btn btn-green" id="btn-import" type="button" disabled>Импортировать</button>
           </div>
+          <div class="card ofavs-card">
+            <div class="card-head">
+              <h2>Избранное по кодам</h2>
+              <button class="btn ghost" id="btn-ofavs-refresh" type="button">Обновить</button>
+            </div>
+            <p class="muted small">Группы избранного у каждого кода — только просмотр. Нажмите на шаблон, чтобы открыть его.</p>
+            <div class="ofavs" id="ofavs-list"></div>
+          </div>
           <div class="card journal-card">
             <div class="card-head">
               <h2>Журнал изменений</h2>
               <input class="journal-filter" id="journal-filter" type="search" placeholder="Фильтр: кто, что, шаблон" autocomplete="off">
               <button class="btn ghost" id="btn-journal-refresh" type="button">Обновить</button>
             </div>
-            <p class="muted small">Кто добавлял и менял шаблоны и словарь, кто публиковал объявления, кто что предлагал и какие предложения приняли или отклонили. Админы видны по названию кода («Админ», «Админ 2»), операторы — по имени, которое они указали.</p>
+            <p class="muted small">Кто добавлял и менял шаблоны и словарь, кто публиковал объявления, кто что предлагал и какие предложения приняли или отклонили. Админы и владелец видны по названию кода, которое вы им дали («Общий», «Динара», «Аружан»), операторы — по имени, которое указали в предложении.</p>
             <div class="journal" id="journal-list"></div>
           </div>
         </div>
@@ -566,16 +574,16 @@
 
   <div class="toasts" id="toasts" aria-live="polite"></div>
 
-  <script src="js/config.js?v=30"></script>
-  <script src="js/vocab.js?v=30"></script>
-  <script src="js/words.js?v=30"></script>
-  <script src="js/speller.js?v=30"></script>
-  <script src="js/corrector.js?v=30"></script>
-  <script src="js/tones.js?v=30"></script>
-  <script src="js/fill.js?v=30"></script>
-  <script src="js/api.js?v=30"></script>
-  <script src="js/mock-backend.js?v=30"></script>
-  <script src="js/pets.js?v=30"></script>
-  <script src="js/app.js?v=30"></script>
+  <script src="js/config.js?v=31"></script>
+  <script src="js/vocab.js?v=31"></script>
+  <script src="js/words.js?v=31"></script>
+  <script src="js/speller.js?v=31"></script>
+  <script src="js/corrector.js?v=31"></script>
+  <script src="js/tones.js?v=31"></script>
+  <script src="js/fill.js?v=31"></script>
+  <script src="js/api.js?v=31"></script>
+  <script src="js/mock-backend.js?v=31"></script>
+  <script src="js/pets.js?v=31"></script>
+  <script src="js/app.js?v=31"></script>
 </body>
 </html>

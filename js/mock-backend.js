@@ -210,6 +210,16 @@
         t.kz_checked = !!checked;
         return { ok: true };
       }),
+      ownerFavs: (token) => run((db) => {
+        auth(db, token, 'owner');
+        return DEMO_CODES.map((c) => ({
+          code: c.label, role: c.role,
+          groups: db.favs.filter((g) => g.code_id === c.id).map((g) => ({
+            id: g.id, name: g.name,
+            items: g.items.map((id) => db.templates.find((t) => t.id === id)).filter(Boolean).map((t) => ({ id: t.id, title: t.title })),
+          })),
+        }));
+      }),
       favsList: (token) => run((db) => {
         const s = auth(db, token, 'admin');
         return clone(db.favs.filter((g) => g.code_id === s.code_id).map(({ code_id, ...g }) => g));

@@ -1040,6 +1040,34 @@ $$;
 revoke execute on function public._kz_checked_on_edit() from public, anon, authenticated;
 grant execute on function public.template_kz_check(text, bigint, boolean) to anon, authenticated;
 
+-- ---------- Владелец видит избранное всех кодов (только просмотр) ----------
+create or replace function public.owner_favs(p_token text)
+returns json
+language plpgsql security definer
+set search_path = public, extensions
+as $$
+begin
+  perform public._auth(p_token, 'owner');
+  return (
+    select coalesce(json_agg(json_build_object(
+             'code', c.label, 'role', c.role,
+             'groups', (
+               select coalesce(json_agg(json_build_object(
+                        'id', g.id, 'name', g.name,
+                        'items', (
+                          select coalesce(json_agg(json_build_object('id', t.id, 'title', t.title) order by i.added_at), '[]'::json)
+                            from public.fav_items i join public.templates t on t.id = i.template_id
+                           where i.group_id = g.id))
+                      order by g.sort, g.id), '[]'::json)
+                 from public.fav_groups g where g.code_id = c.id))
+           order by c.id), '[]'::json)
+      from public.access_codes c
+  );
+end;
+$$;
+
+grant execute on function public.owner_favs(text) to anon, authenticated;
+
 -- ---------- Права на функции ----------
 -- Служебные функции закрыты; сайту доступны только «публичные» ручки.
 
