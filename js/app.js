@@ -1361,7 +1361,7 @@
         const t = new Date(s.created_at);
         const when = t.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
         return `<tr class="${s.is_me ? 'me' : ''}" style="animation-delay:${i * 50}ms">
-          <td><b>${esc(s.code)}</b>${s.person ? ' · ' + esc(s.person) : ''}${s.is_me ? '<span class="me-badge">Это вы</span>' : ''}</td>
+          <td><span class="code-mask" title="Сам код не показывается — в базе он хранится только в зашифрованном виде">••••••</span> <b>${esc(s.code)}</b>${s.is_me ? '<span class="me-badge">Это вы</span>' : ''}</td>
           <td>${esc(ROLE_NAMES[s.role] || s.role)}</td>
           <td>${esc(when)}</td>
           <td>${fmtLeft(left)}<div class="bar"><span style="width:${pct}%"></span></div></td>

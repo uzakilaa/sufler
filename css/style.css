@@ -1025,3 +1025,6 @@ html { scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: rgba(67
 .result-edit[hidden] { display: none; }
 #btn-edit-result.on { background: var(--green); color: var(--cream); box-shadow: none; }
 .pane-actions { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; justify-content: flex-end; }
+
+/* код в списке сессий — звёздочками, рядом имя */
+.code-mask { display: inline-block; font-family: ui-monospace, Consolas, monospace; letter-spacing: .12em; color: var(--muted); background: var(--cream); border-radius: 6px; padding: 1px 7px; margin-right: 4px; font-size: 13px; vertical-align: 1px; }
