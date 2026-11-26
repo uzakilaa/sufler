@@ -609,7 +609,7 @@
     const ta = $('#result-edit');
     const fixed = corrector.correct(ta.value);
     const n = C.diffWords(ta.value, fixed).filter((p) => p.changed).length;
-    $('#changes-hint').textContent = n ? `правка · поправлю слов: ${n} — на «Готово»` : 'правка · ошибок не вижу';
+    $('#changes-hint').textContent = (n ? `поправлю слов: ${n}` : 'ошибок не вижу') + ' · Enter — применить, Shift+Enter — новая строка';
     return fixed;
   }
   function startEdit() {
@@ -677,6 +677,8 @@
     ta.addEventListener('input', () => { clearTimeout(editTimer); editTimer = setTimeout(editHint, 400); });
     ta.addEventListener('keydown', (ev) => {
       if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); finishEdit(); }
+      // Enter — сразу применить исправления; новая строка — Shift+Enter (Ctrl+Enter, как везде, копирует)
+      if (ev.key === 'Enter' && !ev.shiftKey && !ev.ctrlKey && !ev.metaKey && !ev.altKey && !ev.isComposing) { ev.preventDefault(); finishEdit(); }
     });
     // начали писать в черновике — правку готового текста сохраняем и выходим из неё
     draft.addEventListener('focus', () => { if (editing) finishEdit(); });
