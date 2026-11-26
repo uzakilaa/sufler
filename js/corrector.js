@@ -25,6 +25,9 @@
     ['хор дня', 'хорошего дня!'],
     ['всег доб', 'всего доброго!'],
     ['обр', 'обращайтесь!'],
+    ['прет', 'здравствуйте!'],
+    ['уоч', 'уточните'],
+    ['утч', 'уточните'],
   ];
 
   const DEFAULT_TYPOS = [
@@ -183,6 +186,26 @@
     return text.replace(dict.re, (m) => {
       const v = dict.map.get(normKey(m));
       return v == null ? m : matchCase(m, v);
+    });
+  }
+
+  // Сокращение набрано с одной опечаткой (переставил буквы, соседняя клавиша): «спч» → «спс» → «спасибо».
+  // Только для незнакомых слов из 3–6 букв и только если похожее сокращение одно.
+  function fuzzyShortcuts(text, dict, sp) {
+    if (!dict || !Speller || !Speller.dist) return text;
+    const keys = [...dict.map.keys()].filter((k) => !k.includes(' ') && k.length >= 3);
+    return text.replace(/(?<![\p{L}\p{N}-])[а-яё]{3,6}(?![\p{L}\p{N}-])/giu, (w) => {
+      const t = lower(w);
+      if (dict.map.has(t) || (sp && sp.isKnown(t))) return w;
+      let best = null;
+      let bestD = 2;
+      let ties = 0;
+      for (const k of keys) {
+        if (Math.abs(k.length - t.length) > 1 || k[0] !== t[0]) continue;
+        const d = Speller.dist(t, k, 1);
+        if (d < bestD) { bestD = d; best = k; ties = 0; } else if (d === bestD) ties++;
+      }
+      return best && bestD <= 0.6 && !ties ? matchCase(w, best) : w;
     });
   }
 
@@ -424,6 +447,16 @@
 
   /* ---------- Точка в конце ---------- */
 
+  // Вопрос без знака: «сколько ждать» → «Сколько ждать?», «остались ли вопросы» → «…?»
+  const Q_START = /^(?:сколько|когда|где|куда|откуда|почему|зачем|как|какой|какая|какое|какие|каким|какую|кто|кому|кого|что|чем|чего|можно|могу|могли|правильно|верно|подойдет|подойдёт|получилось|получится|пришло|пришли|пришел|пришёл|приходило|видите|удобно)(?:\s|$)/i;
+  function isQuestion(sentence) {
+    const s = lower(sentence.trim()).replace(/^[«"(]+/, '');
+    if (!s || s.includes(',')) return false;                       // «как только …, …» — не вопрос
+    if (/^(?:как только|что касается|когда (?:деньги|средства|карта|заявка|проверка)|где бы|кто бы|что бы)/.test(s)) return false;
+    if (/^(?:можно|могу|правильно|верно|подойдет|подойдёт|получилось|получится|пришло|пришли|пришел|пришёл|приходило|видите|удобно)\s/.test(s) && !/\sли(?:\s|$)/.test(s) && !/^(?:можно|могу)\s/.test(s)) return false;
+    return Q_START.test(s) || /^[\p{L}-]+\s+ли(?:\s|$)/u.test(s);
+  }
+
   function finishLine(line) {
     const t = line.replace(/\s+$/, '');
     if (!t) return t;
@@ -441,7 +474,8 @@
       if (closes > opens) return t; // это смайлик, а не скобка
     }
     if ((last === '»' || last === '"' || last === '”') && END.includes(prev)) return t;
-    return t + '.';
+    const tail = t.split(/[.!?…]\s+/).pop();
+    return t + (isQuestion(tail) ? '?' : '.');
   }
 
   /* ---------- Казахский текст ---------- */
@@ -515,6 +549,7 @@
     text = text.replace(/[ \t  -​]+/g, ' ');
     text = text.split('\n').map((l) => l.trim()).join('\n')
       .replace(/\n{3,}/g, '\n\n').replace(/^\n+|\n+$/g, '');
+    text = text.split('\n').map((l) => (isKazakh(l) ? l : fuzzyShortcuts(l, dict, getSpeller()))).join('\n');
     text = applyDict(text, dict);
     // Каждая строка — на своём языке: казахские строки русским словарём не правим
     const kz = text.split('\n').map(isKazakh);

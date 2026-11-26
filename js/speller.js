@@ -165,21 +165,40 @@
 
   /* ---------- Расстояние между словами (с перестановкой соседних букв) ---------- */
 
+  // При быстром наборе чаще всего: переставлены две буквы, нажата соседняя клавиша,
+  // пропущен мягкий знак, задвоена буква. Такие ошибки «дешевле» остальных —
+  // поэтому «карат» → «карта» (а не «карате»), «отправте» → «отправьте».
+  const KB_ROWS = ['йцукенгшщзхъ', 'фывапролджэ', 'ячсмитьбю'];
+  const KB_NEAR = new Map();
+  KB_ROWS.forEach((row, r) => [...row].forEach((ch, i) => {
+    const near = new Set();
+    const at = (rr, ii) => { const c = KB_ROWS[rr] && KB_ROWS[rr][ii]; if (c) near.add(c); };
+    at(r, i - 1); at(r, i + 1);
+    at(r - 1, i); at(r - 1, i + 1);
+    at(r + 1, i - 1); at(r + 1, i);
+    KB_NEAR.set(ch, near);
+  }));
+  KB_NEAR.get('е').add('ё'); KB_NEAR.set('ё', new Set(['е']));
+  const subCost = (x, y) => (x === y ? 0 : (KB_NEAR.get(x) && KB_NEAR.get(x).has(y)) ? 0.6 : 1);
+  // вставка/пропуск: ь и ъ, а также задвоенная буква — дешевле
+  const gapCost = (s, k) => (s[k] === 'ь' || s[k] === 'ъ' || (k > 0 && s[k] === s[k - 1]) ? 0.6 : 1);
+
   function dist(a, b, max) {
     const n = a.length;
     const m = b.length;
     if (Math.abs(n - m) > max) return max + 1;
     let prev2 = null;
     let prev = new Array(m + 1);
-    for (let j = 0; j <= m; j++) prev[j] = j;
+    prev[0] = 0;
+    for (let j = 1; j <= m; j++) prev[j] = prev[j - 1] + gapCost(b, j - 1);
     for (let i = 1; i <= n; i++) {
       const cur = new Array(m + 1);
-      cur[0] = i;
+      cur[0] = prev[0] + gapCost(a, i - 1);
       let rowMin = cur[0];
       for (let j = 1; j <= m; j++) {
-        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-        let v = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
-        if (prev2 && i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) v = Math.min(v, prev2[j - 2] + 1);
+        const cost = subCost(a[i - 1], b[j - 1]);
+        let v = Math.min(prev[j] + gapCost(a, i - 1), cur[j - 1] + gapCost(b, j - 1), prev[j - 1] + cost);
+        if (prev2 && i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) v = Math.min(v, prev2[j - 2] + 0.5);
         cur[j] = v;
         if (v < rowMin) rowMin = v;
       }
@@ -279,7 +298,7 @@
               if (f.w.startsWith(t)) consider(0.3 + penalty(f) * 0.5, f);
               else if (maxPre) {
                 const d = dist(t, f.w.slice(0, len), maxPre);
-                if (d <= maxPre) consider(d + preCost + penalty(f) * 0.5, f);
+                if (d <= maxPre) consider(d + preCost + (L - len === 1 ? 0.3 : 0) + penalty(f) * 0.5, f);
               }
             }
           }
@@ -346,7 +365,7 @@
       if (!person && noun.after && noun.g) person = noun.g === 'pl' ? '3p' : '3s';
       if (!person && prev.some((w) => PLURAL_SUBJ.has(w))) person = '3p';
       // В начале фразы перед «пожалуйста» — просьба: «Уточните, пожалуйста»
-      if (!person && !prev.length && ctx.nextWord === 'пожалуйста') person = 'imp';
+      if (!person && !prev.length) person = 'imp';
       const best = Math.min(...res.cands.map((f) => f.cost));
       const top = res.cands.filter((f) => f.cost <= best + 0.15);
       const bestOf = (g) => Math.min(...top.filter((f) => f.g === g).map((f) => f.cost));
@@ -398,9 +417,28 @@
         const w = t.slice(0, i) + t.slice(i + 1);
         if (known(w)) return { cost: 0, cands: [{ w, g: -1, tags: '', i: 0, cost: 0 }] };
       }
+      for (let i = 1; i < t.length; i++) {
+        const w = t.slice(0, i) + 'ь' + t.slice(i);
+        if (known(w)) return { cost: 0, cands: [{ w, g: -1, tags: '', i: 0, cost: 0 }] };
+      }
       const r = candidates(t);
-      if (!r) return null;
       if (plausible(t)) {
+        // пропущена одна буква внутри: «проверли» → «проверили» (ищем напрямую, а не только среди ближайших)
+        const ins = [];
+        for (let i = 1; i < t.length; i++) {
+          for (const ch of 'аеиоуыэюяйлнрствкмпдзбгжхцчшщфь') {
+            const w = t.slice(0, i) + ch + t.slice(i);
+            const f = V.forms.get(w);
+            if (f && !ins.some((x) => x.w === w)) ins.push({ w, g: f.g, tags: f.tags, i: f.i, cost: 1 + penalty({ ...f, w }) });
+          }
+        }
+        const fromR = r ? r.cands.filter((f) => (f.g >= 0 && f.w.startsWith(t) && f.w.length - t.length <= 2) || missedOne(t, f.w)) : [];
+        const tail = [...fromR, ...ins.filter((x) => !fromR.some((y) => y.w === x.w))];
+        if (!tail.length) return null;
+        return { cost: Math.min(...tail.map((f) => f.cost)), cands: tail };
+      }
+      if (!r) return null;
+      if (false) {
         // Похоже на настоящее слово — разрешаем только дописать 1–2 буквы до слова из ручного словаря
         // («приложени» → «приложение»), опечатки не трогаем.
         const tail = r.cands.filter((f) => (f.g >= 0 && f.w.startsWith(t) && f.w.length - t.length <= 2) || missedOne(t, f.w));
