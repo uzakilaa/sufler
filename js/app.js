@@ -599,8 +599,53 @@
       </button>`).join('');
   }
 
+  /* ---------- Правка готового текста ----------
+   * «Изменить» — готовый текст становится полем. Правишь как хочешь; на «Готово» (или при копировании)
+   * правка становится новым черновиком и проходит через корректор ещё раз: ошибки в новых словах
+   * исправятся, а уже правильный текст останется как был. */
+  let editing = false;
+  let editTimer = 0;
+  function editHint() {
+    const ta = $('#result-edit');
+    const fixed = corrector.correct(ta.value);
+    const n = C.diffWords(ta.value, fixed).filter((p) => p.changed).length;
+    $('#changes-hint').textContent = n ? `правка · поправлю слов: ${n} — на «Готово»` : 'правка · ошибок не вижу';
+    return fixed;
+  }
+  function startEdit() {
+    const btn = $('#btn-edit-result');
+    if (!lastResult) { shake(btn); return; }
+    editing = true;
+    const ta = $('#result-edit');
+    ta.value = lastResult;
+    ta.hidden = false;
+    $('#result').hidden = true;
+    $('span', btn).textContent = 'Готово';
+    btn.classList.add('on');
+    editHint();
+    ta.focus();
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+  }
+  function finishEdit() {
+    if (!editing) return;
+    editing = false;
+    clearTimeout(editTimer);
+    const ta = $('#result-edit');
+    const v = ta.value;
+    ta.hidden = true;
+    $('#result').hidden = false;
+    const btn = $('#btn-edit-result');
+    $('span', btn).textContent = 'Изменить';
+    btn.classList.remove('on');
+    // правка становится черновиком — дальше всё как обычно
+    $('#draft').value = v;
+    if (v.trim()) store.set('draft', v); else store.del('draft');
+    renderResult();
+  }
+
   async function copyResult(clear) {
     const btn = $('#btn-copy');
+    if (editing) finishEdit();
     if (!lastResult) { shake(btn); return; }
     if (await copyText(lastResult)) {
       pulse(btn);
@@ -623,7 +668,18 @@
       raf = requestAnimationFrame(() => { renderResult(true); store.set('draft', draft.value); });
     });
     $('#btn-copy').addEventListener('click', () => copyResult(false));
-    $('#btn-clear').addEventListener('click', () => { draft.value = ''; store.del('draft'); renderResult(); draft.focus(); });
+    $('#btn-clear').addEventListener('click', () => {
+      if (editing) { editing = false; $('#result-edit').hidden = true; $('#result').hidden = false; $('span', $('#btn-edit-result')).textContent = 'Изменить'; $('#btn-edit-result').classList.remove('on'); }
+      draft.value = ''; store.del('draft'); renderResult(); draft.focus();
+    });
+    $('#btn-edit-result').addEventListener('click', () => (editing ? finishEdit() : startEdit()));
+    const ta = $('#result-edit');
+    ta.addEventListener('input', () => { clearTimeout(editTimer); editTimer = setTimeout(editHint, 400); });
+    ta.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); finishEdit(); }
+    });
+    // начали писать в черновике — правку готового текста сохраняем и выходим из неё
+    draft.addEventListener('focus', () => { if (editing) finishEdit(); });
     $('#btn-dict').addEventListener('click', openDict);
     $('#tones-list').addEventListener('click', async (ev) => {
       const b = ev.target.closest('.tone');
