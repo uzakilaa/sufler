@@ -25,6 +25,7 @@
     ['хор дня', 'хорошего дня!'],
     ['всег доб', 'всего доброго!'],
     ['обр', 'обращайтесь!'],
+    ['скок', 'сколько'],
     ['прет', 'здравствуйте!'],
     ['уоч', 'уточните'],
     ['утч', 'уточните'],
@@ -186,6 +187,39 @@
     return text.replace(dict.re, (m) => {
       const v = dict.map.get(normKey(m));
       return v == null ? m : matchCase(m, v);
+    });
+  }
+
+  // Набрано в английской раскладке: «ghbdtn» → «привет», «cgfcb,j» → «спасибо», «yt pyf.» → «не знаю».
+  // Меняем только если получилось знакомое русское слово — Freedom, SuperApp, eSIM и ссылки не трогаем.
+  const EN = "qwertyuiop[]asdfghjkl;'zxcvbnm,.`";
+  const RU = 'йцукенгшщзхъфывапролджэячсмитьбюё';
+  const toRu = (w) => [...w].map((ch) => { const i = EN.indexOf(ch.toLowerCase()); return i < 0 ? ch : (ch !== ch.toLowerCase() ? RU[i].toUpperCase() : RU[i]); }).join('');
+  function fixLayout(text, dict, sp) {
+    if (!sp) return text;
+    const ok = (w) => sp.isKnown(w) || (dict && dict.map.has(lower(w)));
+    return text.replace(/(?<![\p{L}\p{N}@\/:])[a-zA-Z][a-zA-Z,.;'\[\]`]*(?![\p{L}\p{N}])/gu, (m) => {
+      if (/[a-z][A-Z]/.test(m)) return m;                         // SuperApp, eSIM
+      const full = toRu(m);
+      if (ok(full)) return full;
+      const mm = m.match(/^(.*?)([,.;]+)$/);                       // «pyf.» — точка в конце, а не «ю»
+      if (mm && mm[1] && ok(toRu(mm[1]))) return toRu(mm[1]) + mm[2];
+      return m;
+    });
+  }
+
+  // Короткие слова с промахом по соседним клавишам: «ла» / «лп» → «да», «нпт» → «нет».
+  // Только «да» и «нет», только если слово незнакомое и не похоже на сокращение (ПТ, ЗП, ИП…).
+  const SHORT_TARGETS = ['да', 'нет'];
+  const SHORT_KEEP = new Set(['пт', 'зп', 'ип', 'ци', 'пл', 'лк', 'мб', 'кб', 'ок', 'ну', 'пж', 'кз', 'рк', 'рф', 'вн', 'ерез']);
+  function fixShort(text, sp) {
+    if (!sp || !Speller || !Speller.near) return text;
+    return text.replace(/(?<![\p{L}\p{N}-])[а-яё]{2,3}(?![\p{L}\p{N}-])/gu, (w) => {
+      const t = lower(w);
+      if (w !== t && w === w.toUpperCase()) return w;               // ПТ, ЗП — аббревиатуры
+      if (SHORT_KEEP.has(t) || sp.isKnown(t)) return w;
+      const hits = SHORT_TARGETS.filter((d) => d.length === t.length && [...t].every((ch, i) => ch === d[i] || Speller.near(ch, d[i])));
+      return hits.length === 1 ? matchCase(w, hits[0]) : w;
     });
   }
 
@@ -448,12 +482,11 @@
   /* ---------- Точка в конце ---------- */
 
   // Вопрос без знака: «сколько ждать» → «Сколько ждать?», «остались ли вопросы» → «…?»
-  const Q_START = /^(?:сколько|когда|где|куда|откуда|почему|зачем|как|какой|какая|какое|какие|каким|какую|кто|кому|кого|что|чем|чего|можно|могу|могли|правильно|верно|подойдет|подойдёт|получилось|получится|пришло|пришли|пришел|пришёл|приходило|видите|удобно)(?:\s|$)/i;
+  const Q_START = /^(?:сколько|когда|где|куда|откуда|почему|зачем|как|какой|какая|какое|какие|каким|какую|кто|кому|кого|что|чем|чего)(?:\s|$)/i;
   function isQuestion(sentence) {
     const s = lower(sentence.trim()).replace(/^[«"(]+/, '');
     if (!s || s.includes(',')) return false;                       // «как только …, …» — не вопрос
     if (/^(?:как только|что касается|когда (?:деньги|средства|карта|заявка|проверка)|где бы|кто бы|что бы)/.test(s)) return false;
-    if (/^(?:можно|могу|правильно|верно|подойдет|подойдёт|получилось|получится|пришло|пришли|пришел|пришёл|приходило|видите|удобно)\s/.test(s) && !/\sли(?:\s|$)/.test(s) && !/^(?:можно|могу)\s/.test(s)) return false;
     return Q_START.test(s) || /^[\p{L}-]+\s+ли(?:\s|$)/u.test(s);
   }
 
@@ -549,7 +582,11 @@
     text = text.replace(/[ \t  -​]+/g, ' ');
     text = text.split('\n').map((l) => l.trim()).join('\n')
       .replace(/\n{3,}/g, '\n\n').replace(/^\n+|\n+$/g, '');
-    text = text.split('\n').map((l) => (isKazakh(l) ? l : fuzzyShortcuts(l, dict, getSpeller()))).join('\n');
+    text = text.split('\n').map((l) => {
+      if (isKazakh(l)) return l;
+      const sp = getSpeller();
+      return fuzzyShortcuts(fixShort(fixLayout(l, dict, sp), sp), dict, sp);
+    }).join('\n');
     text = applyDict(text, dict);
     // Каждая строка — на своём языке: казахские строки русским словарём не правим
     const kz = text.split('\n').map(isKazakh);

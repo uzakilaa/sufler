@@ -515,7 +515,8 @@
     return out + text.slice(last);
   }
 
-  const api = { createSpeller, correctWords, dist };
+  const near = (a, b) => !!(KB_NEAR.get(a) && KB_NEAR.get(a).has(b));
+  const api = { createSpeller, correctWords, dist, near };
   root.SuflerSpeller = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);
