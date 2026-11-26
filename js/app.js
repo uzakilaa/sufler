@@ -2066,6 +2066,19 @@
     $('#d-shot-view').addEventListener('click', () => viewShot(state.openTemplateId));
 
     // «Лоханулся»
+    // «48ч»: кешбэк зачисляется в течение 48 часов (текст — из шаблона, можно править в «Шаблонах»)
+    const b48 = $('#btn-48');
+    b48.addEventListener('click', async (ev) => {
+      const n = FLOW.find((x) => x.hot);
+      if (!n) return;
+      const lang = pickLang(ev, draftLang());
+      if (await copyText(flowText(n, lang))) {
+        noKzWarn(state.templates.find((x) => x.title === n.title), lang);
+        pulse(b48);
+        bubble(ev.clientX || b48.getBoundingClientRect().left + 30, (ev.clientY || b48.getBoundingClientRect().top) - 6);
+      }
+    });
+
     $$('[data-oops]').forEach((b) => b.addEventListener('click', async (ev) => {
       if (await copyText(oopsText(pickLang(ev, b.dataset.oops === 'tpl' ? state.lang : draftLang())))) {
         pulse(b);

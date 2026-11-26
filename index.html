@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=29">
+  <link rel="stylesheet" href="css/style.css?v=30">
 </head>
 <body>
   <!-- Фон рисуется кодом: пятна плывут, поверх лёгкое зерно -->
@@ -141,7 +141,11 @@
               placeholder="прив ваша карта заблокирована изза подозрительной операции подождите пожалуйста минуту"></textarea>
             <div class="pane-foot">
               <button class="btn ghost" id="btn-dict" type="button"><svg class="ico"><use href="#i-book"/></svg>Сокращения и словарь</button>
-              <button class="btn ghost" id="btn-clear" type="button">Очистить</button>
+              <span class="pane-actions">
+                <button class="btn oops-btn" type="button" data-oops="ru" title="Скопировать: «Просим не обращать внимания на предыдущее сообщение…» · Shift — другой язык"><svg class="ico"><use href="#i-oops"/></svg>Лох</button>
+                <button class="btn h48-btn" type="button" id="btn-48" title="Скопировать: «Кешбэки обрабатываются и зачисляются в течение 48 часов…» · Shift — другой язык"><svg class="ico"><use href="#i-coin"/></svg>48ч</button>
+                <button class="btn ghost" id="btn-clear" type="button">Очистить</button>
+              </span>
             </div>
           </div>
           <div class="pane pane-out">
@@ -562,16 +566,16 @@
 
   <div class="toasts" id="toasts" aria-live="polite"></div>
 
-  <script src="js/config.js?v=29"></script>
-  <script src="js/vocab.js?v=29"></script>
-  <script src="js/words.js?v=29"></script>
-  <script src="js/speller.js?v=29"></script>
-  <script src="js/corrector.js?v=29"></script>
-  <script src="js/tones.js?v=29"></script>
-  <script src="js/fill.js?v=29"></script>
-  <script src="js/api.js?v=29"></script>
-  <script src="js/mock-backend.js?v=29"></script>
-  <script src="js/pets.js?v=29"></script>
-  <script src="js/app.js?v=29"></script>
+  <script src="js/config.js?v=30"></script>
+  <script src="js/vocab.js?v=30"></script>
+  <script src="js/words.js?v=30"></script>
+  <script src="js/speller.js?v=30"></script>
+  <script src="js/corrector.js?v=30"></script>
+  <script src="js/tones.js?v=30"></script>
+  <script src="js/fill.js?v=30"></script>
+  <script src="js/api.js?v=30"></script>
+  <script src="js/mock-backend.js?v=30"></script>
+  <script src="js/pets.js?v=30"></script>
+  <script src="js/app.js?v=30"></script>
 </body>
 </html>

@@ -1028,3 +1028,9 @@ html { scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: rgba(67
 
 /* код в списке сессий — звёздочками, рядом имя */
 .code-mask { display: inline-block; font-family: ui-monospace, Consolas, monospace; letter-spacing: .12em; color: var(--muted); background: var(--cream); border-radius: 6px; padding: 1px 7px; margin-right: 4px; font-size: 13px; vertical-align: 1px; }
+
+/* «48ч» под черновиком — золотая, как в быстрых фразах */
+.h48-btn { background: #fff4dc; color: #8a5a06; padding: 8px 14px; font-size: 13.5px; box-shadow: inset 0 0 0 1px rgba(200, 150, 40, .45); }
+.h48-btn:hover { background: #d9a23a; color: #fff; }
+.h48-btn.pulse { animation: oopsPulse .55s var(--ease); }
+.pane-foot .oops-btn { padding: 8px 14px; }
